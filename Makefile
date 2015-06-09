@@ -13,6 +13,10 @@ pyflakes: env
 pylint: env
 	@bin/virtual-env-exec pylint triton 2>&1 |less
 
+yapf:
+	find triton -name "*.py" | xargs env/bin/yapf -i --style=google
+	find bin | xargs env/bin/yapf -i --style=google
+
 dev: env env/.pip
 
 env:
