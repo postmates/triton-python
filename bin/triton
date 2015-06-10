@@ -15,7 +15,6 @@ from triton import stream
 
 log = logging.getLogger('triton')
 
-
 GET_COMMAND = 'get'
 PUT_COMMAND = 'put'
 
@@ -39,26 +38,32 @@ def setup_logging(options):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--verbose', '-v',
-                    dest='verbose',
-                    action='append_const',
-                    const=True,
-                    default=list())
+                        dest='verbose',
+                        action='append_const',
+                        const=True,
+                        default=list())
 
     subparsers = parser.add_subparsers(
-            dest='command',
-            help='available commands')
+        dest='command',
+        help='available commands')
 
     parser_put = subparsers.add_parser(
-            PUT_COMMAND,
-            help='read lines from stdin, put to stream')
+        PUT_COMMAND,
+        help='read lines from stdin, put to stream')
 
-    parser_put.add_argument('--stream', '-s', dest='stream', action='store', required=True)
+    parser_put.add_argument('--stream', '-s',
+                            dest='stream',
+                            action='store',
+                            required=True)
 
     parser_get = subparsers.add_parser(
-            GET_COMMAND,
-            help='read records from stream')
+        GET_COMMAND,
+        help='read records from stream')
 
-    parser_get.add_argument('--stream', '-s', dest='stream', action='store', required=True)
+    parser_get.add_argument('--stream', '-s',
+                            dest='stream',
+                            action='store',
+                            required=True)
     parser_get.add_argument('--shard', '-d', dest='stream', nargs='+')
 
     args = parser.parse_args()

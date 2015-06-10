@@ -1,7 +1,6 @@
 import base64
 import time
 import logging
-import pprint
 
 import msgpack
 import boto.kinesis
@@ -9,13 +8,7 @@ import boto.regioninfo
 
 from triton import errors
 
-
-STREAMS = {
-    'rhett_test': {
-        'name': 'rhett_test',
-        'partition_key': 'ts',
-    },
-}
+STREAMS = {'rhett_test': {'name': 'rhett_test', 'partition_key': 'ts',},}
 
 MIN_POLL_INTERVAL_SECS = 1.0
 
@@ -27,13 +20,15 @@ log = logging.getLogger(__name__)
 
 
 class Record(object):
+    __slots__ = ['shard_id', 'seq_num', 'data']
+
     def __init__(self, shard_id, seq_num, data):
         self.shard_id = shard_id
         self.seq_num = seq_num
         self.data = data
 
     @classmethod
-    def _decode_record_data(self, record_data):
+    def _decode_record_data(cls, record_data):
         return msgpack.unpackb(base64.b64decode(record_data))
 
     @classmethod
@@ -46,6 +41,7 @@ class Record(object):
 
 
 class StreamIterator(object):
+
     def __init__(self, stream, shard_id, iterator_type, seq_num=None):
         self.stream = stream
         self.shard_id = shard_id
@@ -61,7 +57,8 @@ class StreamIterator(object):
     @property
     def iter_value(self):
         if self._iter_value is None:
-            log.info("Creating iterator %r", (self.stream.name, self.shard_id, self.iterator_type, self.seq_num))
+            log.info("Creating iterator %r", (self.stream.name, self.shard_id,
+                                              self.iterator_type, self.seq_num))
             i = self.stream.conn.get_shard_iterator(self.stream.name,
                                                     self.shard_id,
                                                     self.iterator_type,
@@ -71,10 +68,12 @@ class StreamIterator(object):
         return self._iter_value
 
     def fill(self):
-        record_resp = self.stream.conn.get_records(self.iter_value, b64_decode=False)
+        record_resp = self.stream.conn.get_records(self.iter_value,
+                                                   b64_decode=False)
 
         behind_latest_secs = record_resp['MillisBehindLatest'] / 1000.0
-        log.debug("Found %d records filling %r (behind %d secs)", len(record_resp['Records']), self, int(behind_latest_secs))
+        log.debug("Found %d records filling %r (behind %d secs)",
+                  len(record_resp['Records']), self, int(behind_latest_secs))
 
         if self.behind_latest_secs > 0.0 and behind_latest_secs == 0:
             log.info("%r has caught up with latest", self)
@@ -84,8 +83,8 @@ class StreamIterator(object):
 
         self.behind_latest_secs = behind_latest_secs
 
-        for r in record_resp['Records']:
-            self.records.append(Record.from_raw_record(self.shard_id, r))
+        for rec in record_resp['Records']:
+            self.records.append(Record.from_raw_record(self.shard_id, rec))
 
         if record_resp.get('NextShardIterator'):
             self._iter_value = record_resp['NextShardIterator']
@@ -115,7 +114,7 @@ class StreamIterator(object):
 
 class CombinedStreamIterator(object):
     """Combines multiple StreamIterators for reading from multiple shards
-    
+
     Handles load balancing between streams.
     """
 
@@ -145,7 +144,7 @@ class CombinedStreamIterator(object):
             log.debug("Throttling for %f secs", throttle_secs)
             time.sleep(throttle_secs)
 
-        self.last_wait = time.time()
+        self._last_wait = time.time()
 
     def _fill(self):
         if not self._fill_iterators:
@@ -161,7 +160,7 @@ class CombinedStreamIterator(object):
         return self
 
     def next(self):
-        # The goal is simple:
+        # The goals is simple:
         # 1. Deliver any record already loaded before loading any new ones.
         # 2. Don't starve any streams
         # 3. Don't hammer empty shards
@@ -180,17 +179,12 @@ class CombinedStreamIterator(object):
 
 
 class Stream(object):
+
     def __init__(self, conn, name, partition_key):
         self.conn = conn
         self.name = name
         self.partition_key = partition_key
         self._shard_ids = None
-
-    def _get_connection(self):
-        if self._conn is None:
-            self._conn = connect_to_region(region)
-
-        return self._conn
 
     def _partition_key(self, data):
         return unicode(data[self.partition_key])
@@ -224,15 +218,15 @@ class Stream(object):
 
     def put(self, **kwargs):
         data = msgpack.packb(kwargs)
-        partition_key = self._partition_key(kwargs)
-        resp = self.conn.put_record(self.name, data, self._partition_key(kwargs))
+        resp = self.conn.put_record(self.name, data,
+                                    self._partition_key(kwargs))
 
         return resp['ShardId'], resp['SequenceNumber']
 
     def build_iterator_for_all(self, shard_nums=None):
         return self._build_iterator(ITER_TYPE_ALL, shard_nums, None)
 
-    def build_iterator_from_seqnum(self, seqnum, shard_num):
+    def build_iterator_from_seqnum(self, shard_num, seq_num):
         return self._build_iterator(ITER_TYPE_FROM_SEQNUM, [shard_num], seq_num)
 
     def build_iterator_from_latest(self, shard_nums=None):
@@ -251,10 +245,9 @@ def connect_to_region(region_name, **kw_params):
     # NOTE(rhettg): current version of boto doesn't know about us-west-1 for
     # kinesis
     region = boto.regioninfo.RegionInfo(
-                name=region_name,
-                endpoint='kinesis.{}.amazonaws.com'.format(region_name),
-                connection_cls=boto.kinesis.layer1.KinesisConnection
-            )
+        name=region_name,
+        endpoint='kinesis.{}.amazonaws.com'.format(region_name),
+        connection_cls=boto.kinesis.layer1.KinesisConnection)
 
     return region.connect(**kw_params)
 
