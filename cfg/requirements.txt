@@ -5,3 +5,4 @@ ipython
 pylint
 boto
 yapf
+msgpack-python

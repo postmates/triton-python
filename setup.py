@@ -3,6 +3,7 @@
 
 import os
 import sys
+import glob
 from distutils.core import setup
 
 PACKAGES = ['triton']
@@ -24,5 +25,6 @@ setup(
     long_description=open('README.md').read(),
     author=get_init_val('author'),
     url=get_init_val('url'),
+    scripts=glob.glob("bin/triton*"),
     packages=PACKAGES
 )
