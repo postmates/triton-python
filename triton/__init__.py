@@ -14,3 +14,5 @@ __build__ = 0
 __author__ = 'Postmates, Inc'
 __license__ = 'Private'
 __copyright__ = 'Copyright 2015 Postmates'
+
+from .stream import get_stream

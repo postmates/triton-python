@@ -41,6 +41,14 @@ class Record(object):
 
 
 class StreamIterator(object):
+    """Handles the workflow of reading from a shard
+
+    Args:
+        stream - Instance of Stream()
+        shard_id - Which shard we're reading from (shardId-00001)
+        iterator_type - How we're iterating, like 'LATEST' or 'TRIM_HORIZON'
+        seq_num - For 'AFTER_SEQUENCE_NUMBER' type, tells us where to start.
+    """
 
     def __init__(self, stream, shard_id, iterator_type, seq_num=None):
         self.stream = stream
@@ -224,17 +232,19 @@ class Stream(object):
         return resp['ShardId'], resp['SequenceNumber']
 
     def build_iterator_for_all(self, shard_nums=None):
-        return self._build_iterator(ITER_TYPE_ALL, shard_nums, None)
+        shard_ids = self._select_shard_ids(shard_nums):
+        return self._build_iterator(ITER_TYPE_ALL, shard_ids, None)
 
-    def build_iterator_from_seqnum(self, shard_num, seq_num):
-        return self._build_iterator(ITER_TYPE_FROM_SEQNUM, [shard_num], seq_num)
+    def build_iterator_from_seqnum(self, shard_id, seq_num):
+        return self._build_iterator(ITER_TYPE_FROM_SEQNUM, [shard_id], seq_num)
 
     def build_iterator_from_latest(self, shard_nums=None):
-        return self._build_iterator(ITER_TYPE_LATEST, shard_nums, None)
+        shard_ids = self._select_shard_ids(shard_nums):
+        return self._build_iterator(ITER_TYPE_LATEST, shard_ids, None)
 
-    def _build_iterator(self, iterator_type, shard_nums, seq_num):
+    def _build_iterator(self, iterator_type, shard_ids, seq_num):
         all_iters = []
-        for shard_id in self._select_shard_ids(shard_nums):
+        for shard_id in shard_ids:
             i = StreamIterator(self, shard_id, iterator_type, seq_num)
             all_iters.append(i)
 

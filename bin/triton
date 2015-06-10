@@ -11,7 +11,7 @@ import boto.regioninfo
 import boto.kinesis.layer1
 import msgpack
 
-from triton import stream
+import triton
 
 log = logging.getLogger('triton')
 
@@ -73,7 +73,7 @@ def main():
     region = os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
 
     if args.command == GET_COMMAND:
-        cmd_stream = stream.get_stream(args.stream, region)
+        cmd_stream = triton.get_stream(args.stream, region)
 
         running = True
         i = cmd_stream.build_iterator_from_latest()
@@ -90,7 +90,7 @@ def main():
                 break
 
     elif args.command == PUT_COMMAND:
-        cmd_stream = stream.get_stream(args.stream, region)
+        cmd_stream = triton.get_stream(args.stream, region)
 
         for line in sys.stdin:
             cmd_stream.put(msg=line, ts=time.time())
