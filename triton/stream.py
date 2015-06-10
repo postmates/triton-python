@@ -1,6 +1,11 @@
 import base64
+import time
+import logging
 
 import msgpack
+
+from triton import errors
+
 
 STREAMS = {
     'rhett_test': {
@@ -13,45 +18,23 @@ ITER_TYPE_LATEST = 'LATEST'
 ITER_TYPE_ALL = 'TRIM_HORIZON'
 ITER_TYPE_FROM_SEQNUM = 'AFTER_SEQUENCE_NUMBER'
 
-
-def stream_latest(conn, stream, shard_num):
-    return _records(conn, stream, shard_num, 'LATEST')
-
-
-def stream_all(conn, stream, shard_num):
-    return _records(conn, stream, shard_num, 'TRIM_HORIZON')
-
-
-def stream_after(conn, stream, shard_num, sequence_num):
-    return _records(conn, stream, shard_num, 'AFTER_SEQUENCE_NUMBER', sequence_num)
-
-
-def _records(conn, stream, shard_num, iterator_type, sequence_num=None):
-    stream_describe_resp = conn.describe_stream(stream['name'])
-    shard_id = stream_describe_resp['StreamDescription']['Shards'][shard_num]['ShardId']
-
-    i = conn.get_shard_iterator(stream['name'], shard_id, iterator_type)
-
-    iter_value = i['ShardIterator']
-    while True:
-        # NOTE: We have to do our own b64 decoding, because kinesis assumes the
-        # data is utf-8 (whaaat?)
-        record_resp = conn.get_records(iter_value, b64_decode=False)
-        for r in record_resp['Records']:
-            d = msgpack.unpackb(base64.b64decode(r['Data']))
-            yield r['SequenceNumber'], d
-
-        iter_value = record_resp['NextShardIterator']
-
-        if len(record_resp['Records']) == 0:
-            time.sleep(0.250)
+log = logging.getLogger(__name__)
 
 
 class Record(object):
     def __init__(self, seq_num, shard_id, data):
         self.seq_num = seq_num
-        self.shard_id = shard_Id
+        self.shard_id = shard_id
         self.data = data
+
+    @classmethod
+    def _decode_record_data(self, record_data):
+        return msgpack.unpackb(base64.b64decode(record_data))
+
+    @classmethod
+    def from_raw_record(cls, shard_id, raw_record):
+        return cls(raw_record['SequenceNumber'], shard_id,
+                   cls._decode_record_data(raw_record['Data']))
 
 
 class StreamIterator(object):
@@ -66,9 +49,6 @@ class StreamIterator(object):
 
         self._empty = True
 
-    def _decode_data(self, record):
-        return msgpack.unpackb(base64.b64decode(record['Data']))
-
     @property
     def iter_value(self):
         if self._iter_value is None:
@@ -78,11 +58,12 @@ class StreamIterator(object):
                                                     self.seq_num)
             self._iter_value = i['ShardIterator']
 
+        return self._iter_value
+
     def fill(self):
         record_resp = self.stream.conn.get_records(self.iter_value, b64_decode=False)
         for r in record_resp['Records']:
-            self.records.append(Record(r['SequenceNumber'], self.shard_id,
-                                        self._decode_data(r['Data'])))
+            self.records.append(Record.from_raw_record(self.shard_id, r))
 
         self._iter_value = record_resp['NextShardIterator']
 
@@ -140,6 +121,9 @@ class CombinedStreamIterator(object):
                   iter_to_fill.shard_id)
         self._records += list(iter_to_fill)
 
+    def __iter__(self):
+        return self
+
     def next(self):
         # The goal is simple:
         # 1. Deliver any record already loaded before loading any new ones.
@@ -164,13 +148,18 @@ class Stream(object):
         self.conn = conn
         self.name = name
         self.partition_key = partition_key
+        self._shard_ids = None
 
     def _get_connection(self):
         if self._conn is None:
+            self._conn = connect_to_region(region)
+
+        return self._conn
 
     def _partition_key(self, data):
         return unicode(data[self.partition_key])
 
+    @property
     def shard_ids(self):
         if self._shard_ids is None:
             self._shard_ids = []
@@ -188,9 +177,14 @@ class Stream(object):
         shard_ids = []
         if shard_nums:
             for shard_num in shard_nums:
-                shard_ids.append(self.shard_ids[shard_num])
+                try:
+                    shard_ids.append(self.shard_ids[shard_num])
+                except IndexError:
+                    raise errors.ShardNotFoundError()
         else:
             shard_ids = self.shard_ids
+
+        return shard_ids
 
     def emit(self, **kwargs):
         data = msgpack.packb(kwargs)
@@ -211,7 +205,7 @@ class Stream(object):
     def _build_iterator(self, iterator_type, shard_nums, seq_num):
         all_iters = []
         for shard_id in self._select_shard_ids(shard_nums):
-            i = StreamIterator(self.conn, self, shard_id, iterator_type, seq_num)
+            i = StreamIterator(self, shard_id, iterator_type, seq_num)
             all_iters.append(i)
 
         return CombinedStreamIterator(all_iters)
