@@ -17,3 +17,7 @@ class Error(Exception):
 class ShardNotFoundError(Error):
     """Indicates the requested shard isn't known"""
     pass
+
+
+class EndOfShardError(Error):
+    pass

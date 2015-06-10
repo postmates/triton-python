@@ -43,7 +43,7 @@ class StreamIteratorTest(TestCase):
     def test_fill_empty(self):
         s = turtle.Turtle()
         def get_records(*args, **kwargs):
-            return {'NextShardIterator': 2, 'Records': []}
+            return {'NextShardIterator': 2, 'MillisBehindLatest': 0, 'Records': []}
 
         s.conn.get_records = get_records
 
@@ -59,7 +59,7 @@ class StreamIteratorTest(TestCase):
         raw_record = generate_raw_record()
         s = turtle.Turtle()
         def get_records(*args, **kwargs):
-            return {'NextShardIterator': 2, 'Records': [raw_record]}
+            return {'NextShardIterator': 2, 'MillisBehindLatest': 0, 'Records': [raw_record]}
 
         s.conn.get_records = get_records
 
@@ -129,7 +129,7 @@ class CombinedStreamIteratorTest(TestCase):
 
         c = stream.CombinedStreamIterator([i])
         c._fill()
-        c.running = False
+        c._running = False
 
         records = list(c)
         assert_equal(records, [1])
@@ -151,7 +151,7 @@ class CombinedStreamIteratorTest(TestCase):
         # test with running = False (so it ends), we have to pre-fill.
         c._fill()
         c._fill()
-        c.running = False
+        c._running = False
 
         records = list(c)
 
@@ -205,7 +205,7 @@ class StreamTest(TestCase):
         with assert_raises(errors.ShardNotFoundError):
             shard_ids = s._select_shard_ids([4])
 
-    def test_emit(self):
+    def test_put(self):
         c = turtle.Turtle()
         def put_record(*args):
             return {'ShardId': '0001', 'SequenceNumber': 1}
@@ -213,7 +213,7 @@ class StreamTest(TestCase):
 
         s = stream.Stream(c, 'test stream', 'value')
 
-        shard_id, seq_num = s.emit(value=0)
+        shard_id, seq_num = s.put(value=0)
         assert_equal(seq_num, 1)
         assert_equal(shard_id, '0001')
 
