@@ -1,6 +1,7 @@
 import base64
 import time
 import logging
+import io
 
 import msgpack
 import boto.kinesis
@@ -262,9 +263,11 @@ def connect_to_region(region_name, **kw_params):
     return region.connect(**kw_params)
 
 
-def get_stream(stream_name, region_name):
-    config = STREAMS[stream_name]
+def get_stream(stream_name, config):
+    s_config = config.get(stream_name)
+    if not s_config:
+        raise errors.StreamNotConfiguredError()
 
-    conn = connect_to_region(region_name)
+    conn = connect_to_region(s_config.get('region', 'us-east-1'))
 
-    return Stream(conn, config['name'], config['partition_key'])
+    return Stream(conn, s_config['name'], s_config['partition_key'])

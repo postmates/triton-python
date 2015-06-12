@@ -13,6 +13,10 @@ class Error(Exception):
     pass
 
 
+class StreamNotConfiguredError(Error):
+    pass
+
+
 class ShardNotFoundError(Error):
     """Indicates the requested shard isn't known"""
     pass

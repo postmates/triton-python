@@ -66,10 +66,12 @@ def main():
 
     setup_logging(args)
 
-    region = os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
+    config = triton.load_config(os.environ.get('TRITON_CONFIG', '/etc/triton.yaml'))
+    if not config:
+        parser.error("Failed to load TRITON_CONFIG")
 
     if args.command == GET_COMMAND:
-        cmd_stream = triton.get_stream(args.stream, region)
+        cmd_stream = triton.get_stream(args.stream, config)
 
         running = True
         i = cmd_stream.build_iterator_from_latest()

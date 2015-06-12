@@ -15,4 +15,5 @@ __author__ = 'Postmates, Inc'
 __license__ = 'Private'
 __copyright__ = 'Copyright 2015 Postmates'
 
+from .config import load_config
 from .stream import get_stream
