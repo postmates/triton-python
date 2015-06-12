@@ -9,7 +9,6 @@ import boto.regioninfo
 
 from triton import errors
 
-STREAMS = {'rhett_test': {'name': 'rhett_test', 'partition_key': 'ts',},}
 
 MIN_POLL_INTERVAL_SECS = 1.0
 
