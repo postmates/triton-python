@@ -7,10 +7,6 @@ import pprint
 import base64
 import time
 
-import boto.regioninfo
-import boto.kinesis.layer1
-import msgpack
-
 import triton
 
 log = logging.getLogger('triton')

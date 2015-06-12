@@ -232,14 +232,14 @@ class Stream(object):
         return resp['ShardId'], resp['SequenceNumber']
 
     def build_iterator_for_all(self, shard_nums=None):
-        shard_ids = self._select_shard_ids(shard_nums):
+        shard_ids = self._select_shard_ids(shard_nums)
         return self._build_iterator(ITER_TYPE_ALL, shard_ids, None)
 
     def build_iterator_from_seqnum(self, shard_id, seq_num):
         return self._build_iterator(ITER_TYPE_FROM_SEQNUM, [shard_id], seq_num)
 
     def build_iterator_from_latest(self, shard_nums=None):
-        shard_ids = self._select_shard_ids(shard_nums):
+        shard_ids = self._select_shard_ids(shard_nums)
         return self._build_iterator(ITER_TYPE_LATEST, shard_ids, None)
 
     def _build_iterator(self, iterator_type, shard_ids, seq_num):
