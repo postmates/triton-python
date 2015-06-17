@@ -22,11 +22,12 @@ they will want to use. That yaml file will look like:
     my_stream:
       name: my_stream_v2
       partition_key: value
+      region: us-west-1
 
 Clients generating records will reference the `my_stream` stream which will
-automatically know to use the real underlying stream of `my_stream_v2`. Records
-put into this stream are assumed to have a key named `value` which is use for
-partitioning.
+automatically know to use the real underlying stream of `my_stream_v2` in the
+`us-west-1` region. Records put into this stream are assumed to have a key
+named `value` which is use for partitioning.
 
 
 ### Demo
@@ -50,13 +51,14 @@ Adding records to the stream is easy:
 
     import triton
 
-    s = triton.get_stream('my_stream', 'us-west-1')
+    c = triton.load_config("/etc/triton.yaml")
+
+    s = triton.get_stream('my_stream', c)
     s.put(value='hi mom', ts=time.time())
 
 
 For more advanced uses, you can record the shard and sequence number returned
 by the put operation.
-
 
     shard, seq_num = s.put(...)
 
@@ -70,7 +72,9 @@ the lightest of workloads you'll likely want to have multiple shards. Triton mak
 
     import triton
 
-    s = triton.get_stream('my_stream', 'us-west-1')
+    c = triton.load_config("/etc/triton.yaml")
+
+    s = triton.get_stream('my_stream', c)
     i = s.build_iterator_from_latest()
 
     for rec in i:
@@ -140,7 +144,6 @@ If you need to debug your application with ipython:
 
 ## TODO
 
-  * YAML file configuration
   * It would probably be helpful to have some common code for building a worker
     process that just handles records.
   * Utilities for dealing with S3 backups for stream data

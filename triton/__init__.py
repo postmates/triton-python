@@ -12,6 +12,7 @@ __description__ = 'Triton - Data Pipeline'
 __url__ = 'https://github.com/postmates/postal-triton'
 __build__ = 0
 __author__ = 'Postmates, Inc'
+__author_email__ = 'rhett@postmates.com'
 __license__ = 'Private'
 __copyright__ = 'Copyright 2015 Postmates'
 

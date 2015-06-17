@@ -24,6 +24,7 @@ setup(
     description=get_init_val('description'),
     long_description=open('README.md').read(),
     author=get_init_val('author'),
+    author_email=get_init_val('author_email'),
     url=get_init_val('url'),
     scripts=glob.glob("bin/triton*"),
     packages=PACKAGES
