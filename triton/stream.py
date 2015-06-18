@@ -4,7 +4,7 @@ import logging
 import io
 
 import msgpack
-import boto.kinesis
+import boto.kinesis.layer1
 import boto.regioninfo
 
 from triton import errors
