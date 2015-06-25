@@ -1,0 +1,7 @@
+triton (0.0.3)
+
+  * Fix command line arguments for shard numbers
+  * Fix throttling
+  * Graceful handling of provisioning errors
+
+-- Rhett Garber <rhettg@gmail.com>  Thu, 25 Jun 2015 15:34:00 -0700
