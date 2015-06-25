@@ -5,6 +5,7 @@ import io
 
 import msgpack
 import boto.kinesis.layer1
+from boto.kinesis.exceptions import ProvisionedThroughputExceededException
 import boto.regioninfo
 
 from triton import errors
@@ -76,8 +77,17 @@ class StreamIterator(object):
         return self._iter_value
 
     def fill(self):
-        record_resp = self.stream.conn.get_records(self.iter_value,
-                                                   b64_decode=False)
+        try:
+            record_resp = self.stream.conn.get_records(self.iter_value,
+                                                       b64_decode=False)
+        except ProvisionedThroughputExceededException:
+            # We set our poll interval to be conservative (and match
+            # recommended kinesis libraries) but it's always possible that
+            # insufficient capacity has been provisioned. Most likely, this is
+            # transient and something we can recover from. But we should
+            # complain loudly.
+            log.error("Rate exceeded for %r:%r", self.stream.name, self.shard_id)
+            return
 
         behind_latest_secs = record_resp['MillisBehindLatest'] / 1000.0
         log.debug("Found %d records filling %r (behind %d secs)",
