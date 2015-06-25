@@ -60,7 +60,7 @@ def main():
                             dest='stream',
                             action='store',
                             required=True)
-    parser_get.add_argument('--shard', '-d', dest='stream', nargs='+')
+    parser_get.add_argument('--shard', '-d', dest='shards', type=int, nargs='+')
 
     args = parser.parse_args()
 
@@ -74,7 +74,7 @@ def main():
         cmd_stream = triton.get_stream(args.stream, config)
 
         running = True
-        i = cmd_stream.build_iterator_from_latest()
+        i = cmd_stream.build_iterator_from_latest(shard_nums=args.shards)
         while True:
             try:
                 for rec in i:

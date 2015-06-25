@@ -221,8 +221,8 @@ class StreamTest(TestCase):
         c = turtle.Turtle()
 
         s = stream.Stream(c, 'test stream', 'value')
-        s._shard_ids = ['0001', '0002']
+        shard_ids = ['0001', '0002']
 
-        i = s._build_iterator(stream.ITER_TYPE_LATEST, [], None)
+        i = s._build_iterator(stream.ITER_TYPE_LATEST, shard_ids, None)
         assert_equal(len(i.iterators), 2)
 
