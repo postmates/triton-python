@@ -68,6 +68,8 @@ class StreamIteratorTest(TestCase):
 
         i.fill()
 
+        assert not i._empty
+
         assert_equal(i.iter_value, 2)
         assert_equal(len(i.records), 1)
         assert i.records[0].data['value'] is True

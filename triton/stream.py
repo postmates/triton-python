@@ -93,6 +93,7 @@ class StreamIterator(object):
 
         for rec in record_resp['Records']:
             self.records.append(Record.from_raw_record(self.shard_id, rec))
+            self._empty = False
 
         if record_resp.get('NextShardIterator'):
             self._iter_value = record_resp['NextShardIterator']
@@ -142,13 +143,9 @@ class CombinedStreamIterator(object):
 
         secs_since_fill = time.time() - self._last_wait
 
-        if len(self.iterators) > 0:
-            min_fill_interval = MIN_POLL_INTERVAL_SECS / len(self.iterators)
-        else:
-            min_fill_interval = MIN_POLL_INTERVAL_SECS
-
-        if secs_since_fill <= min_fill_interval:
-            throttle_secs = min_fill_interval - secs_since_fill
+        throttle_secs = MIN_POLL_INTERVAL_SECS - secs_since_fill
+        if throttle_secs > 0.0:
+            throttle_secs = MIN_POLL_INTERVAL_SECS - secs_since_fill
             log.debug("Throttling for %f secs", throttle_secs)
             time.sleep(throttle_secs)
 
