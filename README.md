@@ -113,6 +113,23 @@ and the second worker would do:
 Note that these are 'share numbers', not shard ids. These are indexes into the
 actual shard list.
 
+### Consuming Archives
+
+Triton data is typically archived to S3. Using the triton command, you can view that data:
+
+    $ triton cat --bucket=triton-data --stream=my_stream --start-date=20150715 --end-date=20150715
+
+Or using the API, something like:
+
+    import triton
+
+    c = triton.load_config("/etc/triton.yaml")
+    b = triton.open_bucket("triton-data", "us-west-1")
+    s = triton.stream_from_s3_store(b, c['my_stream'], start_dt, end_dt)
+
+    for rec in s:
+        ... do something ...
+
 
 ## Development
 
@@ -142,9 +159,18 @@ If you need to debug your application with ipython:
 
     In [2]:
 
+## Postmates Deployment
+
+Since this is a private, non-pypi repo. We store our builds in S3.
+
+    $ python setup.py sdist
+    $ md5sum dist/py-triton-<version>.tar.gz
+    $ aws s3 cp dist/py-triton-<version>.tar.gz s3://com.postmates.pypi/
+
+Then you can update the appropriate entry in
+[virtualenv-mgmt](https://github.com/postmates/virtualenv-mgmt).
+
 ## TODO
 
   * It would probably be helpful to have some common code for building a worker
     process that just handles records.
-  * Utilities for dealing with S3 backups for stream data
-  * Do we need similiar interfaces for golang?
