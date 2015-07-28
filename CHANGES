@@ -1,6 +1,7 @@
 triton (0.0.4)
 
   * Support for writing archive files
+  * Support for reading tri files from S3 (triton cat)
 
 -- Rhett Garber <rhettg@gmail.com>  Thu, 27 Jul 2015 20:36:00 -0700
 

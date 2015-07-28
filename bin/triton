@@ -1,18 +1,22 @@
 #!/usr/bin/python
 import argparse
+import datetime
 import os
 import sys
 import logging
 import pprint
 import base64
 import time
+import json
 
 import triton
+import triton.store
 
 log = logging.getLogger('triton')
 
 GET_COMMAND = 'get'
 PUT_COMMAND = 'put'
+CAT_COMMAND = 'cat'
 
 
 def setup_logging(options):
@@ -62,6 +66,26 @@ def main():
                             required=True)
     parser_get.add_argument('--shard', '-d', dest='shards', type=int, nargs='+')
 
+    parser_cat = subparsers.add_parser(
+        CAT_COMMAND,
+        help='read records from stdin, file or S3 bucket')
+    parser_cat.add_argument('--stream', '-s',
+                            dest='stream',
+                            action='store',
+                            required=False)
+    parser_cat.add_argument('--bucket', '-b',
+                            dest='bucket',
+                            action='store',
+                            required=False)
+    parser_cat.add_argument('--start-date', '-t',
+                            dest='start_date',
+                            action='store',
+                            required=False)
+    parser_cat.add_argument('--end-date', '-e',
+                            dest='end_date',
+                            action='store',
+                            required=False)
+
     args = parser.parse_args()
 
     setup_logging(args)
@@ -89,10 +113,31 @@ def main():
                 break
 
     elif args.command == PUT_COMMAND:
-        cmd_stream = triton.get_stream(args.stream, region)
+        cmd_stream = triton.get_stream(args.stream, config)
 
         for line in sys.stdin:
             cmd_stream.put(msg=line, ts=time.time())
+
+    elif args.command == CAT_COMMAND:
+        if not sys.stdin.isatty():
+            stream = triton.store.decoder(sys.stdin)
+        elif args.bucket:
+            region = os.environ.get('AWS_DEFAULT_REGION', 'us-west-1')
+
+            if not (args.start_date and args.end_date):
+                parser.error("Dates required")
+
+            start_dt = datetime.datetime.strptime(args.start_date, '%Y%m%d')
+            end_dt = datetime.datetime.strptime(args.end_date, '%Y%m%d')
+
+            bucket = triton.store.open_bucket(args.bucket, region)
+            stream = triton.stream_from_s3_store(bucket, config[args.stream],
+                                                 start_dt, end_dt)
+        else:
+            parser.error("Nothing to do")
+
+        for rec in stream:
+            print json.dumps(rec)
 
 
 if __name__ == '__main__':

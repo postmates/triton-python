@@ -12,7 +12,8 @@ class StreamArchiveWriterFilePathTest(TestCase):
     @setup
     def build_stream(self):
         self.dt = datetime.datetime(2015, 7, 24)
-        self.stream = store.StreamArchiveWriter("foo", self.dt, "/tmp")
+        self.stream = store.StreamArchiveWriter({'name': "foo"}, self.dt,
+                                                "/tmp")
 
     def test(self):
         assert self.stream.file_path.startswith(
@@ -25,7 +26,8 @@ class StreamArchiveWriterWriteTest(TestCase):
     @setup
     def build_stream(self):
         self.dt = datetime.datetime(2015, 7, 24)
-        self.stream = store.StreamArchiveWriter("foo", self.dt, "/tmp")
+        self.stream = store.StreamArchiveWriter({'name': "foo"}, self.dt,
+                                                "/tmp")
 
     def test_buffer(self):
         self.stream.put(ts=time.time(), value="hello")
@@ -47,8 +49,8 @@ class StreamArchiveReaderShortTest(TestCase):
 
     @setup
     def create_data(self):
-        writer = store.StreamArchiveWriter("foo", datetime.datetime.utcnow(),
-                                           "/tmp")
+        writer = store.StreamArchiveWriter({'name': "foo"},
+                                           datetime.datetime.utcnow(), "/tmp")
         self.file_path = writer.file_path
 
         writer.put(ts=time.time(), value="hello")
@@ -75,8 +77,8 @@ class StreamArchiveReaderFullTest(TestCase):
 
     @setup
     def create_data(self):
-        writer = store.StreamArchiveWriter("foo", datetime.datetime.utcnow(),
-                                           "/tmp")
+        writer = store.StreamArchiveWriter({'name': "foo"},
+                                           datetime.datetime.utcnow(), "/tmp")
         self.file_path = writer.file_path
 
         # We want multiple objects, in multiple snappy frames
