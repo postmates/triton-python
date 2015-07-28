@@ -8,17 +8,20 @@ from triton import store
 
 
 class StreamArchiveWriterFilePathTest(TestCase):
+
     @setup
     def build_stream(self):
         self.dt = datetime.datetime(2015, 7, 24)
         self.stream = store.StreamArchiveWriter("foo", self.dt, "/tmp")
 
     def test(self):
-        assert self.stream.file_path.startswith("/tmp/20150724/foo-archive-"), self.stream.file_path
+        assert self.stream.file_path.startswith(
+            "/tmp/20150724/foo-archive-"), self.stream.file_path
         assert self.stream.file_path.endswith('.tri')
 
 
 class StreamArchiveWriterWriteTest(TestCase):
+
     @setup
     def build_stream(self):
         self.dt = datetime.datetime(2015, 7, 24)
@@ -38,3 +41,66 @@ class StreamArchiveWriterWriteTest(TestCase):
         assert os.path.exists(self.stream.file_path)
 
         shutil.rmtree(os.path.dirname(self.stream.file_path))
+
+
+class StreamArchiveReaderShortTest(TestCase):
+
+    @setup
+    def create_data(self):
+        writer = store.StreamArchiveWriter("foo", datetime.datetime.utcnow(),
+                                           "/tmp")
+        self.file_path = writer.file_path
+
+        writer.put(ts=time.time(), value="hello")
+
+        writer.close()
+
+    @setup
+    def build_reader(self):
+        self.reader = store.StreamArchiveReader(self.file_path)
+
+    def test(self):
+        recs = list(self.reader)
+
+        assert_equal(len(recs), 1)
+        assert_equal(recs[0]['value'], "hello")
+        assert recs[0]['ts']
+
+    @teardown
+    def cleanup_data(self):
+        shutil.rmtree(os.path.dirname(self.file_path))
+
+
+class StreamArchiveReaderFullTest(TestCase):
+
+    @setup
+    def create_data(self):
+        writer = store.StreamArchiveWriter("foo", datetime.datetime.utcnow(),
+                                           "/tmp")
+        self.file_path = writer.file_path
+
+        # We want multiple objects, in multiple snappy frames
+        writer.put(ts=time.time(), value="hello")
+        writer.put(ts=time.time(), value="hello 1")
+
+        writer.flush()
+
+        writer.put(ts=time.time(), value="hello 2")
+        writer.put(ts=time.time(), value="hello 3")
+
+        writer.close()
+
+    @setup
+    def build_reader(self):
+        self.reader = store.StreamArchiveReader(self.file_path)
+
+    def test(self):
+        recs = list(self.reader)
+
+        assert_equal(len(recs), 4)
+        assert_equal(recs[0]['value'], "hello")
+        assert_equal(recs[3]['value'], "hello 3")
+
+    @teardown
+    def cleanup_data(self):
+        shutil.rmtree(os.path.dirname(self.file_path))

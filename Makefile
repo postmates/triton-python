@@ -15,6 +15,7 @@ pylint: env
 
 yapf:
 	find triton -name "*.py" | xargs env/bin/yapf -i --style=google
+	find tests -name "*.py" | xargs env/bin/yapf -i --style=google
 	find bin | xargs env/bin/yapf -i --style=google
 
 dev: env env/.pip

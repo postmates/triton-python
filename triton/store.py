@@ -59,3 +59,55 @@ class StreamArchiveWriter(object):
         if self.writer:
             self.writer.close()
             self.writer = None
+
+
+def decoder(stream):
+    snappy_stream = snappy.StreamDecompressor()
+    unpacker = msgpack.Unpacker()
+    for data in stream:
+        buf = snappy_stream.decompress(data)
+        if buf:
+            unpacker.feed(buf)
+            # Oh to have yield from
+            for rec in unpacker:
+                yield rec
+
+
+class StreamArchiveReader(object):
+
+    def __init__(self, file_path):
+        self.file_path = file_path
+        self.reader = None
+        self.records = []
+        self.snappy_stream = snappy.StreamDecompressor()
+        self.unpacker = msgpack.Unpacker()
+
+    def _open(self):
+        if self.reader is None:
+            self.reader = io.open(self.file_path, mode="rb")
+
+    def _fill(self):
+        self._open()
+        while True:
+            data = self.reader.read(io.DEFAULT_BUFFER_SIZE)
+            if not data:
+                return
+
+            buf = self.snappy_stream.decompress(data)
+            if buf:
+                self.unpacker.feed(buf)
+                self.records += list(self.unpacker)
+                # We found some records, we can get out of here.
+                return
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if len(self.records) == 0:
+            self._fill()
+
+        try:
+            return self.records.pop(0)
+        except IndexError:
+            raise StopIteration

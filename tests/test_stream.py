@@ -11,14 +11,13 @@ from triton import errors
 def generate_raw_record():
     data = base64.b64encode(msgpack.packb({'value': True}))
 
-    raw_record = {
-        'SequenceNumber': 1,
-        'Data': data
-    }
+    raw_record = {'SequenceNumber': 1, 'Data': data}
 
     return raw_record
 
+
 class RecordTest(TestCase):
+
     def test_from_raw_record(self):
         raw_record = generate_raw_record()
 
@@ -29,8 +28,10 @@ class RecordTest(TestCase):
 
 
 class StreamIteratorTest(TestCase):
+
     def test_iter_value(self):
         s = turtle.Turtle()
+
         def get_shard_iterator(*args, **kwargs):
             return {'ShardIterator': 1}
 
@@ -42,8 +43,13 @@ class StreamIteratorTest(TestCase):
 
     def test_fill_empty(self):
         s = turtle.Turtle()
+
         def get_records(*args, **kwargs):
-            return {'NextShardIterator': 2, 'MillisBehindLatest': 0, 'Records': []}
+            return {
+                'NextShardIterator': 2,
+                'MillisBehindLatest': 0,
+                'Records': []
+            }
 
         s.conn.get_records = get_records
 
@@ -58,8 +64,13 @@ class StreamIteratorTest(TestCase):
     def test_fill_records(self):
         raw_record = generate_raw_record()
         s = turtle.Turtle()
+
         def get_records(*args, **kwargs):
-            return {'NextShardIterator': 2, 'MillisBehindLatest': 0, 'Records': [raw_record]}
+            return {
+                'NextShardIterator': 2,
+                'MillisBehindLatest': 0,
+                'Records': [raw_record]
+            }
 
         s.conn.get_records = get_records
 
@@ -94,9 +105,10 @@ class StreamIteratorTest(TestCase):
 
         def fill():
             assert False
+
         i.fill = fill
 
-        found_records =[]
+        found_records = []
         for r in i:
             found_records.append(r)
 
@@ -105,6 +117,7 @@ class StreamIteratorTest(TestCase):
 
 
 class CombinedStreamIteratorTest(TestCase):
+
     def test_first_no_wait(self):
         c = stream.CombinedStreamIterator([])
 
@@ -161,6 +174,7 @@ class CombinedStreamIteratorTest(TestCase):
 
 
 class StreamTest(TestCase):
+
     def test_partition_key(self):
         c = turtle.Turtle()
         s = stream.Stream(c, 'test stream', 'value')
@@ -169,14 +183,16 @@ class StreamTest(TestCase):
 
     def test_shards_ids(self):
         c = turtle.Turtle()
+
         def describe_stream(_):
             return {
-                'StreamDescription': {'HasMoreShards': False, 'Shards':
-                                      [
-                                          {'ShardId': '0001'},
-                                          {'ShardId': '0002'}
-                                      ]}}
-
+                'StreamDescription': {
+                    'HasMoreShards': False,
+                    'Shards': [
+                        {'ShardId': '0001'}, {'ShardId': '0002'}
+                    ]
+                }
+            }
 
         c.describe_stream = describe_stream
         s = stream.Stream(c, 'test stream', 'value')
@@ -209,8 +225,10 @@ class StreamTest(TestCase):
 
     def test_put(self):
         c = turtle.Turtle()
+
         def put_record(*args):
             return {'ShardId': '0001', 'SequenceNumber': 1}
+
         c.put_record = put_record
 
         s = stream.Stream(c, 'test stream', 'value')
@@ -227,4 +245,3 @@ class StreamTest(TestCase):
 
         i = s._build_iterator(stream.ITER_TYPE_LATEST, shard_ids, None)
         assert_equal(len(i.iterators), 2)
-
