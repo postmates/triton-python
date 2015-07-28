@@ -7,7 +7,9 @@ import snappy
 
 MAX_BUFFER_SIZE = 1024 * 1024
 
+
 class StreamArchiveWriter(object):
+
     def __init__(self, name, base_dt, base_path):
         self.name = name
         self.base_dt = base_dt

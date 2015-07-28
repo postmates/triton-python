@@ -10,7 +10,6 @@ import boto.regioninfo
 
 from triton import errors
 
-
 MIN_POLL_INTERVAL_SECS = 1.0
 
 ITER_TYPE_LATEST = 'LATEST'
@@ -86,7 +85,8 @@ class StreamIterator(object):
             # insufficient capacity has been provisioned. Most likely, this is
             # transient and something we can recover from. But we should
             # complain loudly.
-            log.error("Rate exceeded for %r:%r", self.stream.name, self.shard_id)
+            log.error("Rate exceeded for %r:%r", self.stream.name,
+                      self.shard_id)
             return
 
         behind_latest_secs = record_resp['MillisBehindLatest'] / 1000.0
