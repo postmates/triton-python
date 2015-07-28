@@ -1,3 +1,9 @@
+triton (0.0.4)
+
+  * Support for writing archive files
+
+-- Rhett Garber <rhettg@gmail.com>  Thu, 27 Jul 2015 20:36:00 -0700
+
 triton (0.0.3)
 
   * Fix command line arguments for shard numbers
