@@ -67,10 +67,9 @@ class StreamIterator(object):
         if self._iter_value is None:
             log.info("Creating iterator %r", (self.stream.name, self.shard_id,
                                               self.iterator_type, self.seq_num))
-            i = self.stream.conn.get_shard_iterator(self.stream.name,
-                                                    self.shard_id,
-                                                    self.iterator_type,
-                                                    self.seq_num)
+            i = self.stream.conn.get_shard_iterator(
+                self.stream.name, self.shard_id, self.iterator_type,
+                self.seq_num)
             self._iter_value = i['ShardIterator']
 
         return self._iter_value
@@ -126,9 +125,8 @@ class StreamIterator(object):
             raise StopIteration
 
     def __repr__(self):
-        return u'<StreamIterator {} {} ({})>'.format(self.stream.name,
-                                                     self.shard_id,
-                                                     self.iterator_type)
+        return u'<StreamIterator {} {} ({})>'.format(
+            self.stream.name, self.shard_id, self.iterator_type)
 
 
 class CombinedStreamIterator(object):
@@ -253,7 +251,6 @@ class Stream(object):
             resp_value.append((r['ShardId'], r['SequenceNumber']))
 
         return resp_value
-
 
     def build_iterator_for_all(self, shard_nums=None):
         shard_ids = self._select_shard_ids(shard_nums)
