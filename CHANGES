@@ -1,3 +1,9 @@
+triton (0.0.5)
+
+  * Support for writing multiple records
+
+-- Rhett Garber <rhettg@gmail.com>  Wed, 2 Sept 2015 11:33:00 -0700
+
 triton (0.0.4)
 
   * Support for writing archive files

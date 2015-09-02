@@ -237,6 +237,22 @@ class StreamTest(TestCase):
         assert_equal(seq_num, 1)
         assert_equal(shard_id, '0001')
 
+    def test_put_many(self):
+        c = turtle.Turtle()
+
+        def put_records(*args):
+            return {'Records': [{'ShardId': '0001', 'SequenceNumber': 1}]}
+
+        c.put_records = put_records
+
+        s = stream.Stream(c, 'test stream', 'value')
+
+        resp = s.put_many([dict(value=0)])
+
+        shard_id, seq_num = resp[0]
+        assert_equal(seq_num, 1)
+        assert_equal(shard_id, '0001')
+
     def test_build_iterator(self):
         c = turtle.Turtle()
 

@@ -238,6 +238,23 @@ class Stream(object):
 
         return resp['ShardId'], resp['SequenceNumber']
 
+    def put_many(self, records):
+        data_recs = []
+        for r in records:
+            data_recs.append({
+                'Data': msgpack.packb(r),
+                'PartitionKey': self._partition_key(r),
+            })
+
+        resp = self.conn.put_records(data_recs, self.name)
+
+        resp_value = []
+        for r in resp['Records']:
+            resp_value.append((r['ShardId'], r['SequenceNumber']))
+
+        return resp_value
+
+
     def build_iterator_for_all(self, shard_nums=None):
         shard_ids = self._select_shard_ids(shard_nums)
         return self._build_iterator(ITER_TYPE_ALL, shard_ids, None)
