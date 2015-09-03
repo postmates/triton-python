@@ -1,0 +1,13 @@
+machine:
+  pre:
+    - sudo apt-get install libsnappy-dev
+
+dependencies:
+  pre:
+    - pip install -r cfg/requirements.txt
+  override:
+    - pip install .
+
+test:
+  override:
+    - testify tests
