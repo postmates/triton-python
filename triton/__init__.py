@@ -8,12 +8,12 @@ triton
 
 __title__ = 'triton'
 __version__ = '0.0.5'
-__description__ = 'Triton - Data Pipeline'
-__url__ = 'https://github.com/postmates/postal-triton'
+__description__ = 'Triton - Kinesis Data Pipeline'
+__url__ = 'https://github.com/postmates/triton-python'
 __build__ = 0
 __author__ = 'Postmates, Inc'
-__author_email__ = 'rhett@postmates.com'
-__license__ = 'Private'
+__author_email__ = 'rhettg@gmail.com'
+__license__ = 'ISC'
 __copyright__ = 'Copyright 2015 Postmates'
 
 from .config import load_config

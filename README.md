@@ -2,6 +2,8 @@
 
 Python Utility code for building a Data Pipeline with AWS Kinesis.
 
+See [Triton](https://github.com/postmates/go-triton)
+
 Kinesis (http://aws.amazon.com/kinesis/) lets you define streams of records.
 You put records in one end, and the other end can consumer them. The stream
 maintains the records for 24 hours. These streams come in multiple shards
@@ -158,17 +160,6 @@ If you need to debug your application with ipython:
     In [1]: from project.models import Project
 
     In [2]:
-
-## Postmates Deployment
-
-Since this is a private, non-pypi repo. We store our builds in S3.
-
-    $ python setup.py sdist
-    $ md5sum dist/py-triton-<version>.tar.gz
-    $ aws s3 cp dist/py-triton-<version>.tar.gz s3://com.postmates.pypi/
-
-Then you can update the appropriate entry in
-[virtualenv-mgmt](https://github.com/postmates/virtualenv-mgmt).
 
 ## TODO
 
