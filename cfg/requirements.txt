@@ -6,3 +6,5 @@ pylint
 boto
 yapf
 msgpack-python
+python-snappy
+pyzmq

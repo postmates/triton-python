@@ -67,6 +67,47 @@ by the put operation.
 You could in theory communicate these values to some other process if you want
 to ensure they have received this record.
 
+__CAVEAT UTILITOR__: Triton currently only supports data types directly converatible
+into [msgpack formated data](https://github.com/msgpack/msgpack/blob/master/spec.md).
+Unsupported types will raise a `TypeError`.
+
+### Non-Blocking Producers and `tritond`
+
+Using the producer syntax above, `s.put(value='hi mom', ts=time.time())`, will block until
+the operation to put the data into Kinesis is complete, which can take on the order of 100 ms.
+This guarantees that the write has succeeded before continuing the flow of control.
+
+To allow for writes that do not block, triton comes with `tritond`;
+a daemon that will spool Kinesis messages to local memory and write those messages to Kinesis asynchronously.
+Writes via this pathway block for approximately 0.1 ms.
+The `tritond` spools messages to memory and writes all recieved messages to Kinesis
+every 100 ms.
+It is important to note that using this non-blocking pathway eliminates the guarantee
+that data will be written to Kinesis.
+
+An instance of `tritond` needs be running to collect Kinesis writes.
+It is recomended to run an instance on each host that will be producing Kinesis writes.
+By default, `tritond` will listen on `127.0.0.1:3515` or it will
+respect the environment variables `TRITON_ZMQ_HOST` and `TRITON_ZMQ_PORT`.
+The `tritond` uses the same `triton.yaml` files to configure triton streams;
+and will _log errors and skip_ any data if the stream is not configured
+or the config file is not found.
+
+Once `tritond` is running, usage follows the basic write pattern:
+
+    import triton
+
+    c = triton.load_config("/etc/triton.yaml")
+
+    s = triton.get_nonblocking_stream('my_stream', c)
+    s.put(value='hi mom', ts=time.time())
+
+Since the actual Kinesis write happens asynchronously, the shard and sequence number
+are not returned from this operation. 
+Also, as mentioned above, Triton currently only supports data types directly converatible
+into [msgpack formated data](https://github.com/msgpack/msgpack/blob/master/spec.md).
+For data put into a `NonblockingStream` object, unsupported types will log an error and continue.
+
 ### Consumers
 
 Writing consumers is more complicated as you must deal with sharding. Even in
@@ -148,7 +189,7 @@ The tests should all work:
 If you need to debug your application with ipython:
 
     ~/Projects/Project $ make shell
-    Python 2.7.3 (default, Apr 27 2012, 21:31:10) 
+    Python 2.7.3 (default, Apr 27 2012, 21:31:10)
     Type "copyright", "credits" or "license" for more information.
 
     IPython 0.12.1 -- An enhanced Interactive Python.

@@ -1,12 +1,20 @@
 import io
 import yaml
 import logging
+import os
 
 from . import errors
+
+ENV_VAR_TRITON_ZMQ_HOST = 'TRITON_ZMQ_HOST'
+ENV_VAR_TRITON_ZMQ_PORT = 'TRITON_ZMQ_PORT'
+ZMQ_DEFAULT_HOST = '127.0.0.1'
+ZMQ_DEFAULT_PORT = 3515
 
 log = logging.getLogger(__name__)
 
 REQUIRED_CONFIG_KEYS = ['name', 'partition_key']
+
+_zmq_config = None
 
 
 def load_config(file_name):
@@ -23,3 +31,13 @@ def load_config(file_name):
                     "Missing {} : {}".format(stream_name, k))
 
     return config_dict
+
+
+def get_zmq_config():
+    global _zmq_config
+    if not _zmq_config:
+        zmq_host = os.environ.get(ENV_VAR_TRITON_ZMQ_HOST, ZMQ_DEFAULT_HOST)
+        zmq_port = os.environ.get(ENV_VAR_TRITON_ZMQ_PORT, ZMQ_DEFAULT_PORT)
+        _zmq_config = (zmq_host, zmq_port)
+
+    return _zmq_config

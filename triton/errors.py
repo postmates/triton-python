@@ -13,6 +13,11 @@ class Error(Exception):
     pass
 
 
+class TritonNotConfiguredError(Error):
+    """Indicates no config file found"""
+    pass
+
+
 class StreamNotConfiguredError(Error):
     pass
 

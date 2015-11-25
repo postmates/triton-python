@@ -1,7 +1,6 @@
 import base64
 import time
 import logging
-import io
 
 import msgpack
 import boto.kinesis.layer1
@@ -65,8 +64,10 @@ class StreamIterator(object):
     @property
     def iter_value(self):
         if self._iter_value is None:
-            log.info("Creating iterator %r", (self.stream.name, self.shard_id,
-                                              self.iterator_type, self.seq_num))
+            log.info(
+                "Creating iterator %r", (
+                    self.stream.name, self.shard_id,
+                    self.iterator_type, self.seq_num))
             i = self.stream.conn.get_shard_iterator(
                 self.stream.name, self.shard_id, self.iterator_type,
                 self.seq_num)
@@ -244,7 +245,20 @@ class Stream(object):
                 'PartitionKey': self._partition_key(r),
             })
 
-        resp = self.conn.put_records(data_recs, self.name)
+        return self._put_many_packed(data_recs)
+
+    def _put_many_packed(self, records):
+        """Re-usable method for already packed messages,
+            used here and by tritond for non-blocking writes
+
+        args:
+            records - list() of dicts with the following structure:
+            {
+                'Data': msgpacked-data,
+                'PartitionKey': partition_key of the record
+            }
+        """
+        resp = self.conn.put_records(records, self.name)
 
         resp_value = []
         for r in resp['Records']:
