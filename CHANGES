@@ -1,3 +1,9 @@
+triton (0.0.6)
+
+  * Async / Tritond support (@daveauerbach)
+
+-- Rhett Garber <rhettg@gmail.com>  Tue, 8 Dec 2015 15:27:00 -0700
+
 triton (0.0.5)
 
   * Support for writing multiple records
