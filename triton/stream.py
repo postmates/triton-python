@@ -10,6 +10,7 @@ import boto.regioninfo
 from triton import errors
 
 MIN_POLL_INTERVAL_SECS = 1.0
+KINESIS_MAX_LENGTH = 500  # Can't write more than 500 records at a time
 
 ITER_TYPE_LATEST = 'LATEST'
 ITER_TYPE_ALL = 'TRIM_HORIZON'
@@ -258,11 +259,17 @@ class Stream(object):
                 'PartitionKey': partition_key of the record
             }
         """
-        resp = self.conn.put_records(records, self.name)
-
         resp_value = []
-        for r in resp['Records']:
-            resp_value.append((r['ShardId'], r['SequenceNumber']))
+        num_records = len(records)
+        max_record = 0
+        while max_record < num_records:
+            resp = self.conn.put_records(
+                records[max_record:max_record + KINESIS_MAX_LENGTH], self.name)
+
+            for r in resp['Records']:
+                resp_value.append((r['ShardId'], r['SequenceNumber']))
+
+            max_record += KINESIS_MAX_LENGTH
 
         return resp_value
 

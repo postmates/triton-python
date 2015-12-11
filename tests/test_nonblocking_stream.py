@@ -10,9 +10,10 @@ import random
 import tempfile
 from collections import defaultdict
 
-from triton import nonblocking_stream
+from triton import nonblocking_stream, config
 
 TEST_LOGS_BASE_DIRECTORY_SLUG = 'test_logs'
+TEST_TRITON_ZMQ_PORT = 3517  # in case tritond is running
 
 
 def generate_test_data(primary_key='my_key'):
@@ -80,6 +81,8 @@ class NonblockingStreamEndToEnd(TestCase):
             'streamtest' + str(random.randint(100000, 999999)))
         self.log_file = os.path.join(self.log_directory, 'streamtest')
         os.makedirs(self.log_directory)
+        process_env = os.environ.copy()
+        process_env['TRITON_ZMQ_PORT'] = str(TEST_TRITON_ZMQ_PORT)
         self.server_process = subprocess.Popen(
             [
                 'python',
@@ -87,8 +90,10 @@ class NonblockingStreamEndToEnd(TestCase):
                 '--skip-kinesis',
                 '--output_file',
                 self.log_file
-            ])
+            ],
+            env=process_env)
         time.sleep(2)
+        config.ZMQ_DEFAULT_PORT = TEST_TRITON_ZMQ_PORT
 
     @teardown
     def teardown_server(self):
