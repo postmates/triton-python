@@ -1,3 +1,9 @@
+triton (0.0.7)
+
+  * Fix calls to put_many with >500 records (@daveauerbach)
+
+-- Rhett Garber <rhettg@gmail.com>  Thu, 10 Dec 2015 18:12:00 -0700
+
 triton (0.0.6)
 
   * Async / Tritond support (@daveauerbach)
