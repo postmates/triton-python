@@ -29,3 +29,8 @@ class ShardNotFoundError(Error):
 
 class EndOfShardError(Error):
     pass
+
+
+class KinesisError(Error):
+    """An ambiguous or unknown Kinesis Error"""
+    pass

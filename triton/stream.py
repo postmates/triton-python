@@ -5,12 +5,14 @@ import logging
 import msgpack
 import boto.kinesis.layer1
 from boto.kinesis.exceptions import ProvisionedThroughputExceededException
+from boto.exception import BotoServerError
 import boto.regioninfo
 
 from triton import errors
 
 MIN_POLL_INTERVAL_SECS = 1.0
 KINESIS_MAX_LENGTH = 500  # Can't write more than 500 records at a time
+KINESIS_MAX_RETRYS = 2  # Kinesis 'InternalFailure' retry attempts
 
 ITER_TYPE_LATEST = 'LATEST'
 ITER_TYPE_ALL = 'TRIM_HORIZON'
@@ -233,10 +235,18 @@ class Stream(object):
 
     def put(self, **kwargs):
         data = msgpack.packb(kwargs)
-        resp = self.conn.put_record(self.name, data,
-                                    self._partition_key(kwargs))
+        resp = _call_and_retry(
+            self.conn.put_record,
+            self.name, data,
+            self._partition_key(kwargs)
+        )
 
-        return resp['ShardId'], resp['SequenceNumber']
+        try:
+            return resp['ShardId'], resp['SequenceNumber']
+        except KeyError:
+            raise errors.KinesisError((
+                'An unknown error occurred for stream {},'
+                ' response was {}').format(self.name, resp))
 
     def put_many(self, records):
         data_recs = []
@@ -248,7 +258,7 @@ class Stream(object):
 
         return self._put_many_packed(data_recs)
 
-    def _put_many_packed(self, records):
+    def _put_many_packed(self, records, retry_count=0):
         """Re-usable method for already packed messages,
             used here and by tritond for non-blocking writes
 
@@ -262,15 +272,28 @@ class Stream(object):
         resp_value = []
         num_records = len(records)
         max_record = 0
+        retry_records = []
         while max_record < num_records:
-            resp = self.conn.put_records(
+            resp = _call_and_retry(
+                self.conn.put_records,
                 records[max_record:max_record + KINESIS_MAX_LENGTH], self.name)
 
-            for r in resp['Records']:
-                resp_value.append((r['ShardId'], r['SequenceNumber']))
-
+            for idx, r in enumerate(resp['Records']):
+                try:
+                    resp_value.append((r['ShardId'], r['SequenceNumber']))
+                except KeyError:
+                    retry_records.append(records[max_record + idx])
             max_record += KINESIS_MAX_LENGTH
-
+        if retry_records:
+            if retry_count > KINESIS_MAX_RETRYS:
+                log.error(
+                    'Failed to put %i records to Kinesis',
+                    len(retry_records),
+                    extra={'records': retry_records})
+            else:
+                time.sleep(2 ** retry_count * .1)
+                self._put_many_packed(
+                    retry_records, retry_count=retry_count + 1)
         return resp_value
 
     def build_iterator_for_all(self, shard_nums=None):
@@ -312,3 +335,30 @@ def get_stream(stream_name, config):
     conn = connect_to_region(s_config.get('region', 'us-east-1'))
 
     return Stream(conn, s_config['name'], s_config['partition_key'])
+
+
+def _call_and_retry(kinesis_function, *args, **kwargs):
+    """
+    Retry Logic for generic kinesis calls.
+
+    This code follows the exponetial backoff pattern suggested by
+    http://docs.aws.amazon.com/general/latest/gr/api-retries.html
+    """
+    retries = 0
+    while True:
+        try:
+            return kinesis_function(*args, **kwargs)
+        except BotoServerError as e:
+            if retries > KINESIS_MAX_RETRYS:
+                raise e
+            if e.status / 100 == 4:  # 4xx error
+                raise e
+            if (
+                    e.status / 100 == 5  # 5xx error
+                    or
+                    type(e) == ProvisionedThroughputExceededException
+            ):
+                time.sleep(2 ** retries * .1)
+                retries += 1
+            else:
+                raise e
