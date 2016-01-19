@@ -46,6 +46,7 @@ And then to consume:
 
 (Note the order is actually important here, this consumer is set to 'latest',
 so if your producer produces first, you might miss it.)
+You can set the config by using the environment variable TRITON_CONFIG, the default is /etc/triton.yaml
 
 ### Producers
 
