@@ -62,7 +62,7 @@ class NonblockingStreamTest(TestCase):
     def test_send_event(self):
         s = nonblocking_stream.NonblockingStream('test_stream', 'pkey')
         test_data = generate_test_data()
-        s.put(test_data)
+        s.put(**test_data)
         meta_data, message_data = generate_transmitted_record(test_data)
         mock_sent_meta_data, mock_sent_message_data = (
             nonblocking_stream.threadLocal
@@ -106,7 +106,7 @@ class NonblockingStreamEndToEnd(TestCase):
         test_stream = nonblocking_stream.NonblockingStream(
             stream_name, 'pkey')
         for i in range(10):
-            test_stream.put(generate_test_data())
+            test_stream.put(**generate_test_data())
         time.sleep(1)
         assert_truthy(os.path.exists(self.log_file))
         if os.path.exists(self.log_file):
@@ -121,7 +121,7 @@ class NonblockingStreamEndToEnd(TestCase):
         for stream_name in streams:
             stream = nonblocking_stream.NonblockingStream(
                 stream_name, 'pkey')
-            stream.put(generate_test_data())
+            stream.put(**generate_test_data())
         time.sleep(1)
         if os.path.exists(self.log_file):
             with open(self.log_file, 'rb') as output_file:
@@ -140,7 +140,7 @@ class NonblockingStreamEndToEnd(TestCase):
         test_stream = nonblocking_stream.NonblockingStream(
             stream_name, 'pkey')
         for i in range(send_count):
-            test_stream.put(generate_test_data())
+            test_stream.put(**generate_test_data())
         time.sleep(1)
         if os.path.exists(self.log_file):
             with open(self.log_file, 'rb') as output_file:

@@ -101,12 +101,12 @@ class NonblockingStream(object):
 
         return meta_data, message_data
 
-    def put(self, data):
+    def put(self, **kwargs):
         global _zmq_context
         _thread_connect()
 
         try:
-            meta_data, message_data = self._serialize_context(data)
+            meta_data, message_data = self._serialize_context(kwargs)
         except Exception:
             log.exception(
                 "Triton serialization failure for stream {}".format(
