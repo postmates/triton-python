@@ -292,8 +292,8 @@ class Stream(object):
                     extra={'records': retry_records})
             else:
                 time.sleep(2 ** retry_count * .1)
-                self._put_many_packed(
-                    retry_records, retry_count=retry_count + 1)
+                resp_value.extend(self._put_many_packed(
+                    retry_records, retry_count=retry_count + 1))
         return resp_value
 
     def build_iterator_for_all(self, shard_nums=None):
@@ -349,7 +349,7 @@ def _call_and_retry(kinesis_function, *args, **kwargs):
         try:
             return kinesis_function(*args, **kwargs)
         except BotoServerError as e:
-            if retries > KINESIS_MAX_RETRYS:
+            if retries >= KINESIS_MAX_RETRYS:
                 raise e
             if e.status / 100 == 4:  # 4xx error
                 raise e

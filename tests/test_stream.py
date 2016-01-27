@@ -1,11 +1,13 @@
 from testify import *
 import base64
 import time
+import random
 
 import msgpack
 
 from triton import stream
 from triton import errors
+from boto.exception import BotoServerError
 
 
 def generate_raw_record():
@@ -278,3 +280,79 @@ class StreamTest(TestCase):
 
         i = s._build_iterator(stream.ITER_TYPE_LATEST, shard_ids, None)
         assert_equal(len(i.iterators), 2)
+
+    def test_put_retry(self):
+        c = turtle.Turtle()
+
+        class PutRecord(object):
+            """callable class for call count tracking"""
+            def __init__(self, succeed_on_call=2, error_code=500):
+                self.calls = 0
+                self.succeed_on_call = succeed_on_call
+                self.error_code = error_code
+
+            def __call__(self, *args, **kwargs):
+                self.calls += 1
+                if self.calls < self.succeed_on_call:
+                    raise BotoServerError(self.error_code, "test", "test")
+                else:
+                    return {'ShardId': '0001', 'SequenceNumber': 1}
+
+        put_record = PutRecord()
+
+        c.put_record = put_record
+
+        st = stream.Stream(c, 'test stream', 'value')
+
+        shard_id, seq_num = st.put(value=0)
+        assert_equal(seq_num, 1)
+        assert_equal(shard_id, '0001')
+
+        put_record = PutRecord(succeed_on_call=4)
+        c.put_record = put_record
+        assert_raises(BotoServerError, st.put, value=0)
+
+        put_record = PutRecord(error_code=400)
+        c.put_record = put_record
+        assert_raises(BotoServerError, st.put, value=0)
+
+    def test_put_many_retry(self):
+        c = turtle.Turtle()
+
+        class PutRecords(object):
+            """callable class for call count tracking"""
+            def __init__(self, fail_for_n_calls=1, initial_error_rate=0.9):
+                self.calls = 0
+                self.fail_for_n_calls = fail_for_n_calls
+                self.initial_error_rate = initial_error_rate
+
+            def __call__(self, records, string_name):
+                self.calls += 1
+                if self.calls <= self.fail_for_n_calls:
+                    return self.put_records(records, self.initial_error_rate)
+                else:
+                    return self.put_records(records, 0)
+
+            def put_records(self, records, error_rate):
+                return_records = []
+                for n in range(len(records)):
+                    if random.random() >= error_rate:
+                        return_records.append(
+                            {'ShardId': '0001', 'SequenceNumber': n})
+                    else:
+                        return_records.append({'error': 'test_error'})
+                return {'Records': return_records}
+
+        put_records = PutRecords()
+        c.put_records = put_records
+        s = stream.Stream(c, 'test stream', 'value')
+        test_count = 600
+        resp = s.put_many([dict(value=0)] * test_count)
+        assert_equal(len(resp), test_count)
+
+        put_records = PutRecords(fail_for_n_calls=4, initial_error_rate=1.)
+        c.put_records = put_records
+        s = stream.Stream(c, 'test stream', 'value')
+        test_count = 100
+        resp = s.put_many([dict(value=0)] * test_count)
+        assert_equal(len(resp), 0)
