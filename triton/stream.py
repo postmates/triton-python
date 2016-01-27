@@ -7,6 +7,10 @@ import boto.kinesis.layer1
 from boto.kinesis.exceptions import ProvisionedThroughputExceededException
 import boto.regioninfo
 
+import boto
+boto.config.add_section('Boto')
+boto.config.set('Boto', 'http_socket_timeout', '3')
+
 from triton import errors
 
 MIN_POLL_INTERVAL_SECS = 1.0
