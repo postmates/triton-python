@@ -239,6 +239,18 @@ class StreamTest(TestCase):
         assert_equal(seq_num, 1)
         assert_equal(shard_id, '0001')
 
+    def test_put_fail(self):
+        c = turtle.Turtle()
+
+        def put_record(*args):
+            return {'error': 'unknown'}
+
+        c.put_record = put_record
+
+        s = stream.Stream(c, 'test stream', 'value')
+
+        assert_raises(errors.KinesisError, s.put, value=0)
+
     def test_put_many_basic(self):
         c = turtle.Turtle()
 
@@ -354,5 +366,17 @@ class StreamTest(TestCase):
         c.put_records = put_records
         s = stream.Stream(c, 'test stream', 'value')
         test_count = 100
-        resp = s.put_many([dict(value=0)] * test_count)
-        assert_equal(len(resp), 0)
+        assert_raises(
+            errors.KinesisPutManyError, s.put_many,
+            [dict(value=0)] * test_count)
+
+        put_records = PutRecords(fail_for_n_calls=4, initial_error_rate=.5)
+        c.put_records = put_records
+        s = stream.Stream(c, 'test stream', 'value')
+        test_count = 100
+        try:
+            resp = s.put_many([dict(value=0)] * test_count)
+        except errors.KinesisPutManyError as e:
+            assert_lt(len(e.failed_data), test_count)
+        else:
+            raise Exception('Expected failed records')

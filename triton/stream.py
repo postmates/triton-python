@@ -286,10 +286,9 @@ class Stream(object):
             max_record += KINESIS_MAX_LENGTH
         if retry_records:
             if retry_count > KINESIS_MAX_RETRYS:
-                log.error(
-                    'Failed to put %i records to Kinesis',
-                    len(retry_records),
-                    extra={'records': retry_records})
+                raise errors.KinesisPutManyError(
+                    'Failed to put_many records to Kinesis',
+                    failed_data=retry_records)
             else:
                 time.sleep(2 ** retry_count * .1)
                 resp_value.extend(self._put_many_packed(

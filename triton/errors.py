@@ -34,3 +34,10 @@ class EndOfShardError(Error):
 class KinesisError(Error):
     """An ambiguous or unknown Kinesis Error"""
     pass
+
+
+class KinesisPutManyError(Error):
+    """An ambiguous or unknown Kinesis Error"""
+    def __init__(self, reason, failed_data=None, *args):
+        super(KinesisPutManyError, self).__init__(reason, *args)
+        self.failed_data = failed_data
