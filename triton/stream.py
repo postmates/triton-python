@@ -274,17 +274,29 @@ class Stream(object):
         max_record = 0
         retry_records = []
         while max_record < num_records:
+            # iterate through all the records MAX_LENTH records at a time
+
+            # Note that the following _call_and_retry will only
+            # retry for 500 server errors;
+            # ProvisionedThroughputExceededException
+            # will not happen for put_records
             resp = _call_and_retry(
                 self.conn.put_records,
                 records[max_record:max_record + KINESIS_MAX_LENGTH], self.name)
 
             for idx, r in enumerate(resp['Records']):
+                # Per http://docs.aws.amazon.com/kinesis/
+                # ...latest/APIReference/API_PutRecordsResultEntry.html
+                # ProvisionedThroughputExceededException and InternalFailure
+                # happen on a message by message basis.
+                # Check for individual failed messages and queue for retry
                 try:
                     resp_value.append((r['ShardId'], r['SequenceNumber']))
                 except KeyError:
                     retry_records.append(records[max_record + idx])
             max_record += KINESIS_MAX_LENGTH
         if retry_records:
+            # if any individual messages have failed, retry them now
             if retry_count > KINESIS_MAX_RETRYS:
                 raise errors.KinesisPutManyError(
                     'Failed to put_many records to Kinesis',
@@ -349,8 +361,6 @@ def _call_and_retry(kinesis_function, *args, **kwargs):
             return kinesis_function(*args, **kwargs)
         except BotoServerError as e:
             if retries >= KINESIS_MAX_RETRYS:
-                raise e
-            if e.status / 100 == 4:  # 4xx error
                 raise e
             if (
                     e.status / 100 == 5  # 5xx error
