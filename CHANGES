@@ -1,3 +1,9 @@
+triton (0.0.9)
+
+  * Fix multiple b64 encodings on fail and retry
+
+-- Dave Auerbach <david@postmates.com>  Fri, 29 Jan 2016 17:00:00 -0700
+
 triton (0.0.8)
 
   * Fix nonblocking put interface to match original put

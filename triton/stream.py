@@ -258,16 +258,20 @@ class Stream(object):
 
         return self._put_many_packed(data_recs)
 
-    def _put_many_packed(self, records, retry_count=0):
+    def _put_many_packed(self, records, retry_count=0, b64_encode=True):
         """Re-usable method for already packed messages,
             used here and by tritond for non-blocking writes
 
         args:
             records - list() of dicts with the following structure:
-            {
-                'Data': msgpacked-data,
-                'PartitionKey': partition_key of the record
-            }
+                {
+                    'Data': msgpacked-data,
+                    'PartitionKey': partition_key of the record
+                }
+            retry_count - number of retries for individual failed records
+            b64_encode  - parameter to boto kinesis library included b/c boto
+                          changes the data record itself. We need to pass false
+                          to prevent re-encoding on failure.
         """
         resp_value = []
         num_records = len(records)
@@ -282,7 +286,9 @@ class Stream(object):
             # will not happen for put_records
             resp = _call_and_retry(
                 self.conn.put_records,
-                records[max_record:max_record + KINESIS_MAX_LENGTH], self.name)
+                records[max_record:max_record + KINESIS_MAX_LENGTH],
+                self.name,
+                b64_encode=b64_encode)
 
             for idx, r in enumerate(resp['Records']):
                 # Per http://docs.aws.amazon.com/kinesis/
@@ -304,7 +310,7 @@ class Stream(object):
             else:
                 time.sleep(2 ** retry_count * .1)
                 resp_value.extend(self._put_many_packed(
-                    retry_records, retry_count=retry_count + 1))
+                    retry_records, retry_count=retry_count + 1, b64_encode=False))
         return resp_value
 
     def build_iterator_for_all(self, shard_nums=None):
