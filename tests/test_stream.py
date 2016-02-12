@@ -254,7 +254,7 @@ class StreamTest(TestCase):
     def test_put_many_basic(self):
         c = turtle.Turtle()
 
-        def put_records(*args):
+        def put_records(*args, **kwargs):
             return {'Records': [{'ShardId': '0001', 'SequenceNumber': 1}]}
 
         c.put_records = put_records
@@ -270,7 +270,7 @@ class StreamTest(TestCase):
     def test_put_many_gt_500(self):
         c = turtle.Turtle()
 
-        def put_records(*args):
+        def put_records(*args, **kwargs):
             return {'Records': [
                 {'ShardId': '0001', 'SequenceNumber': n}
                 for n in range(len(args[0]))
@@ -338,7 +338,7 @@ class StreamTest(TestCase):
                 self.fail_for_n_calls = fail_for_n_calls
                 self.initial_error_rate = initial_error_rate
 
-            def __call__(self, records, string_name):
+            def __call__(self, records, string_name, **kwargs):
                 self.calls += 1
                 if self.calls <= self.fail_for_n_calls:
                     return self.put_records(records, self.initial_error_rate)
