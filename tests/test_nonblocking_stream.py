@@ -3,6 +3,8 @@ from testify import *
 import msgpack
 import struct
 import time
+import datetime
+import decimal
 import os
 import shutil
 import subprocess
@@ -24,8 +26,20 @@ def generate_test_data(primary_key='my_key'):
     return data
 
 
+def generate_messy_test_data(primary_key='my_key'):
+    data = {
+        'pkey': primary_key,
+        'value': True,
+        'time': datetime.datetime.now(),
+        'date': datetime.date.today(),
+        'pi': decimal.Decimal('3.14')
+    }
+    return data
+
+
 def generate_transmitted_record(data, stream_name='test_stream'):
-    message_data = msgpack.packb(data)
+    message_data = msgpack.packb(
+        data, default=nonblocking_stream.msgpack_encode_default)
 
     meta_data = struct.pack(
         nonblocking_stream.META_STRUCT_FMT,
@@ -70,9 +84,21 @@ class NonblockingStreamTest(TestCase):
         assert_equal(mock_sent_meta_data, meta_data)
         assert_equal(mock_sent_message_data, message_data)
 
+    def test_send_hard_to_encode_data(self):
+        s = nonblocking_stream.NonblockingStream('test_stream', 'pkey')
+        test_data = generate_messy_test_data()
+        s.put(**test_data)
+        meta_data, message_data = generate_transmitted_record(test_data)
+        mock_sent_meta_data, mock_sent_message_data = (
+            nonblocking_stream.threadLocal
+            .zmq_socket.send_multipart.calls[0][0][0])
+        assert_equal(mock_sent_meta_data, meta_data)
+        assert_equal(mock_sent_message_data, message_data)
+
 
 class NonblockingStreamEndToEnd(TestCase):
     """full end-to-end test case"""
+
     @setup
     def setup_server(self):
         self.base_directory = tempfile.gettempdir()
