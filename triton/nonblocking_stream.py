@@ -106,7 +106,6 @@ class NonblockingStream(object):
             # enhanced packer (it's slower though)
             message_data = msgpack.packb(data, default=msgpack_encode_default)
 
-
         return meta_data, message_data
 
     def put(self, **kwargs):
