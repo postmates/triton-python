@@ -94,6 +94,14 @@ class NonblockingStreamTest(TestCase):
             .zmq_socket.send_multipart.calls[0][0][0])
         assert_equal(mock_sent_meta_data, meta_data)
         assert_equal(mock_sent_message_data, message_data)
+        sent_data = msgpack.unpackb(mock_sent_message_data)
+        assert_equal(
+            sent_data['time'],
+            time.mktime(test_data['time'].utctimetuple()))
+        assert_equal(
+            sent_data['date'],
+            test_data['date'].strftime("%Y-%m-%d"))
+        assert_equal(sent_data['pi'], str(test_data['pi']))
 
 
 class NonblockingStreamEndToEnd(TestCase):
