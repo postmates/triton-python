@@ -7,7 +7,7 @@ triton
 """
 
 __title__ = 'triton'
-__version__ = '0.0.9'
+__version__ = '0.0.10'
 __description__ = 'Triton - Kinesis Data Pipeline'
 __url__ = 'https://github.com/postmates/triton-python'
 __build__ = 0
