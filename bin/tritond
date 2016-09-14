@@ -20,6 +20,7 @@ import os
 import time
 from collections import defaultdict
 import msgpack
+import json
 
 import zmq
 import pystatsd
@@ -50,6 +51,9 @@ log = logging.getLogger("triton.d")
 _triton_config = None
 _streams = dict()
 
+# version byte in our meta struct for JSON meta.
+META_STRUCT_VERSION_JSON = 0x7B
+
 
 def setup_logging(options):
     if len(options.verbose) > 1:
@@ -78,6 +82,35 @@ def get_triton_config():
         raise errors.TritonNotConfiguredError(
             'Failed to load config for tritond')
     return _triton_config
+
+
+def check_meta_version(meta):
+    value, = struct.unpack(">B", meta[0])
+    if value not in (
+        nonblocking_stream.META_STRUCT_VERSION, META_STRUCT_VERSION_JSON
+    ):
+        raise ValueError(value)
+    return value
+
+
+def get_header_data(event_meta, version):
+    if version == nonblocking_stream.META_STRUCT_VERSION:
+        # See nonblocking_stream.network for how this is packed.
+        _, stream_name, partition_key = struct.unpack(
+            nonblocking_stream.META_STRUCT_FMT, event_meta)
+    elif version == META_STRUCT_VERSION_JSON:
+        try:
+            meta_data = json.loads(event_meta)
+        except Exception:
+            raise ValueError('Cannot Parse Meta JSON')
+        try:
+            stream_name = meta_data['stream_name']
+            partition_key = meta_data['partition_key']
+        except Exception:
+            raise ValueError('Cannot Parse Meta JSON')
+    else:
+        raise ValueError('Incorrect meta version')
+    return stream_name, partition_key
 
 
 def load_or_get_stream(stream_name):
@@ -209,14 +242,13 @@ def main():
                 continue
 
             try:
-                nonblocking_stream.check_meta_version(event_meta)
+                version = check_meta_version(event_meta)
+                stream_name, partition_key = get_header_data(
+                    event_meta, version)
             except ValueError:
                 log.warning("Failed to decode event due to version mismatch")
                 continue
 
-            # See nonblocking_stream.network for how this is packed.
-            _, stream_name, partition_key = struct.unpack(
-                nonblocking_stream.META_STRUCT_FMT, event_meta)
             waiting_messages[stream_name].append({
                 'Data': event_data,
                 'PartitionKey': partition_key

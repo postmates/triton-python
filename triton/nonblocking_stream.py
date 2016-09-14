@@ -33,20 +33,9 @@ MAX_QUEUED_MESSAGES = 3500
 # being told to exit.
 LINGER_SHUTDOWN_MSECS = 3000
 
-META_STRUCT_FMT = "!B64p64p"
-
-# We're going to include a version byte in our meta struct for future
-# upgrading.  This is very quickly getting into the kind of bit packing I
-# wanted to avoid for a logging infrastructure, but the performance gain is
-# hard to ignore.
+# version byte in our meta struct for future upgrading.
 META_STRUCT_VERSION = 0x4
-
-
-def check_meta_version(meta):
-    value, = struct.unpack(">B", meta[0])
-    if value != META_STRUCT_VERSION:
-        raise ValueError(value)
-
+META_STRUCT_FMT = "!B64p64p"
 
 threadLocal = threading.local()
 
