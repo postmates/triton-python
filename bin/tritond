@@ -39,7 +39,11 @@ MAX_QUEUED_MESSAGES = 3500
 # Batch writes to Kinesis; collect messages for this long then write
 POLL_LOOP_TIMEOUT_MS = 100
 
-STATSD_PREFIX = 'tritond'
+# See https://github.com/postmates/pystatsd for statsd configuration
+# Note that pystatsd writes raise no exception even if no statsd server is running
+STATSD_PREFIX = 'tritond.'
+STATSD_EVENTCOUNT = STATSD_PREFIX + "eventcount."
+STATSD_LOOPTIME = STATSD_PREFIX + "write_loop.timing"
 
 log = logging.getLogger("triton.d")
 
@@ -104,7 +108,7 @@ def _write_messages_to_streams(waiting_messages):
                 }
             )
         pystatsd.increment(
-            STATSD_PREFIX + ".eventcount." + stream_name),
+            STATSD_EVENTCOUNT + stream_name),
             len(list_of_messages)
         )
 
@@ -234,7 +238,7 @@ def main():
 
             waiting_messages = defaultdict(list)
             last_write = time.time()
-            pystatsd.timing(STATSD_PREFIX + ".write_loop.timing"), time_delta_ms)
+            pystatsd.timing(STATSD_LOOPTIME, time_delta_ms)
 
     collector_sock.close(0)
 
