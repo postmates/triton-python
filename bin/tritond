@@ -22,6 +22,7 @@ from collections import defaultdict
 import msgpack
 
 import zmq
+import pystatsd
 
 from triton import nonblocking_stream
 from triton.stream import get_stream
@@ -37,6 +38,8 @@ MAX_QUEUED_MESSAGES = 3500
 
 # Batch writes to Kinesis; collect messages for this long then write
 POLL_LOOP_TIMEOUT_MS = 100
+
+STATSD_PREFIX = 'tritond'
 
 log = logging.getLogger("triton.d")
 
@@ -100,6 +103,10 @@ def _write_messages_to_streams(waiting_messages):
                     'list_of_messages': list_of_messages
                 }
             )
+        pystatsd.increment(
+            STATSD_PREFIX + ".eventcount." + stream_name),
+            len(list_of_messages)
+        )
 
 
 def _write_messages_to_file(waiting_messages, file_obj):
@@ -211,11 +218,12 @@ def main():
                 'PartitionKey': partition_key
             })
 
+        time_delta_ms = (time.time() - last_write) * 1000
         if (
             len(waiting_messages) > 0
             and
             (
-                ((time.time() - last_write) * 1000 > POLL_LOOP_TIMEOUT_MS)
+                (time_delta_ms > POLL_LOOP_TIMEOUT_MS)
                 or not continue_running[0]
             )
         ):
@@ -226,6 +234,7 @@ def main():
 
             waiting_messages = defaultdict(list)
             last_write = time.time()
+            pystatsd.timing(STATSD_PREFIX + ".write_loop.timing"), time_delta_ms)
 
     collector_sock.close(0)
 

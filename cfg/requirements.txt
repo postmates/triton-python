@@ -8,3 +8,4 @@ yapf
 msgpack-python
 python-snappy
 pyzmq
+pystatsd
