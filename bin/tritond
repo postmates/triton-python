@@ -40,7 +40,7 @@ MAX_QUEUED_MESSAGES = 3500
 POLL_LOOP_TIMEOUT_MS = 100
 
 # See https://github.com/postmates/pystatsd for statsd configuration
-# Note that pystatsd writes raise no exception even if no statsd server is running
+# Note that pystatsd writes raise no exception if no statsd server is running
 STATSD_PREFIX = 'tritond.'
 STATSD_EVENTCOUNT = STATSD_PREFIX + "eventcount."
 STATSD_LOOPTIME = STATSD_PREFIX + "write_loop.timing"
@@ -108,7 +108,7 @@ def _write_messages_to_streams(waiting_messages):
                 }
             )
         pystatsd.increment(
-            STATSD_EVENTCOUNT + stream_name),
+            STATSD_EVENTCOUNT + stream_name,
             len(list_of_messages)
         )
 

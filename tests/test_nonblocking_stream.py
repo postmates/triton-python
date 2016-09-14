@@ -13,6 +13,7 @@ import tempfile
 from collections import defaultdict
 
 from triton import nonblocking_stream, config
+from triton.encoding import msgpack_encode_default
 
 TEST_LOGS_BASE_DIRECTORY_SLUG = 'test_logs'
 TEST_TRITON_ZMQ_PORT = 3517  # in case tritond is running
@@ -39,7 +40,7 @@ def generate_messy_test_data(primary_key='my_key'):
 
 def generate_transmitted_record(data, stream_name='test_stream'):
     message_data = msgpack.packb(
-        data, default=nonblocking_stream.msgpack_encode_default)
+        data, default=msgpack_encode_default)
 
     meta_data = struct.pack(
         nonblocking_stream.META_STRUCT_FMT,
@@ -97,7 +98,7 @@ class NonblockingStreamTest(TestCase):
         sent_data = msgpack.unpackb(mock_sent_message_data)
         assert_equal(
             sent_data['time'],
-            time.mktime(test_data['time'].utctimetuple()))
+            test_data['time'].isoformat(' '))
         assert_equal(
             sent_data['date'],
             test_data['date'].strftime("%Y-%m-%d"))

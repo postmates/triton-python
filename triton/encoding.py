@@ -15,5 +15,5 @@ def msgpack_encode_default(obj):
         return obj.strftime("%Y-%m-%d")
     try:
         return repr(obj)
-    except:
+    except Exception:
         raise TypeError("Unknown type: %r" % (obj,))

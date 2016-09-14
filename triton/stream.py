@@ -9,7 +9,7 @@ from boto.exception import BotoServerError
 import boto.regioninfo
 
 from triton import errors
-from triton import msgpack_encode_default
+from triton.encoding import msgpack_encode_default
 
 
 MIN_POLL_INTERVAL_SECS = 1.0
