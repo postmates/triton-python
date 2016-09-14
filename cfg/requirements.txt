@@ -8,4 +8,4 @@ yapf
 msgpack-python
 python-snappy
 pyzmq
-pystatsd
+-e git://github.com/postmates/pystatsd.git@2.0.0#egg=pystatsd
