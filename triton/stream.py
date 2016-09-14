@@ -9,6 +9,8 @@ from boto.exception import BotoServerError
 import boto.regioninfo
 
 from triton import errors
+from triton import msgpack_encode_default
+
 
 MIN_POLL_INTERVAL_SECS = 1.0
 KINESIS_MAX_LENGTH = 500  # Can't write more than 500 records at a time
@@ -234,7 +236,12 @@ class Stream(object):
         return shard_ids
 
     def put(self, **kwargs):
-        data = msgpack.packb(kwargs)
+        try:
+            data = msgpack.packb(kwargs)
+        except TypeError:
+            # If we fail to serialize our context, we can try again with an
+            # enhanced packer (it's slower though)
+            data = msgpack.packb(kwargs, default=msgpack_encode_default)
         resp = _call_and_retry(
             self.conn.put_record,
             self.name, data,
@@ -251,8 +258,14 @@ class Stream(object):
     def put_many(self, records):
         data_recs = []
         for r in records:
+            try:
+                data = msgpack.packb(r)
+            except TypeError:
+                # If we fail to serialize our context, we can try again with an
+                # enhanced packer (it's slower though)
+                data = msgpack.packb(r, default=msgpack_encode_default)
             data_recs.append({
-                'Data': msgpack.packb(r),
+                'Data': data,
                 'PartitionKey': self._partition_key(r),
             })
 
@@ -310,7 +323,10 @@ class Stream(object):
             else:
                 time.sleep(2 ** retry_count * .1)
                 resp_value.extend(self._put_many_packed(
-                    retry_records, retry_count=retry_count + 1, b64_encode=False))
+                    retry_records,
+                    retry_count=retry_count + 1,
+                    b64_encode=False)
+                )
         return resp_value
 
     def build_iterator_for_all(self, shard_nums=None):

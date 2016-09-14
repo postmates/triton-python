@@ -14,15 +14,13 @@ import logging
 import threading
 import struct
 import atexit
-import time
-import decimal
-import datetime
 
 import zmq
 import msgpack
 
-from . import errors
-from . import config
+from triton import errors
+from triton import config
+from triton import msgpack_encode_default
 
 log = logging.getLogger(__name__)
 
@@ -149,21 +147,5 @@ def close():
         threadLocal.zmq_socket = None
 
     _zmq_context = None
-
-
-def msgpack_encode_default(obj):
-    """Extra encodings for python types into msgpack
-
-    These are attempted if our normal serialization fails.
-    """
-    if isinstance(obj, decimal.Decimal):
-        return str(obj)
-    if isinstance(obj, datetime.datetime):
-        return time.mktime(obj.utctimetuple())
-    if isinstance(obj, datetime.date):
-        return obj.strftime("%Y-%m-%d")
-
-    raise TypeError("Unknown type: %r" % (obj,))
-
 
 atexit.register(close)
