@@ -1,3 +1,13 @@
+triton (0.0.11)
+
+  * Default serializer applies to all data, not just data sent to tritond
+  * New serializers:
+  ** Points -> (lat, long)
+  ** datetime.datetime -> ISO8061 e.g. '2016-06-15 21:39:15.3'
+  ** Other data types -> repr(object)
+  * tritond now accepts JSON metadata header along with binary struct
+  * tritond now sends counts to statsd if server available
+
 triton (0.0.10)
 
   * Add default serializers for common data types not supported by msgpack
