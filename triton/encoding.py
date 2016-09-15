@@ -13,6 +13,9 @@ def msgpack_encode_default(obj):
         return obj.isoformat(' ')
     if isinstance(obj, datetime.date):
         return obj.strftime("%Y-%m-%d")
+    if hasattr(obj, 'coords'):
+        # hack to deal with lat-long points
+        return repr(obj.coords)
     try:
         return repr(obj)
     except Exception:

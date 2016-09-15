@@ -21,6 +21,12 @@ TEST_LOGS_BASE_DIRECTORY_SLUG = 'test_logs'
 TEST_TRITON_ZMQ_PORT = 3517  # in case tritond is running
 
 
+class Point(object):
+
+    def __init__(self, lat, lng):
+        self.coords = (lat, lng)
+
+
 def generate_test_data(primary_key='my_key'):
     data = {
         'pkey': primary_key,
@@ -35,7 +41,8 @@ def generate_messy_test_data(primary_key='my_key'):
         'value': True,
         'time': datetime.datetime.now(),
         'date': datetime.date.today(),
-        'pi': decimal.Decimal('3.14')
+        'pi': decimal.Decimal('3.14'),
+        'point': Point(-122.42083, 37.75512)
     }
     return data
 
@@ -137,6 +144,9 @@ class NonblockingStreamTest(TestCase):
             sent_data['date'],
             test_data['date'].strftime("%Y-%m-%d"))
         assert_equal(sent_data['pi'], str(test_data['pi']))
+        assert_equal(
+            sent_data['point'],
+            str(test_data['point'].coords))
 
 
 class NonblockingStreamEndToEnd(TestCase):
