@@ -94,6 +94,13 @@ The `tritond` uses the same `triton.yaml` files to configure triton streams;
 and will _log errors and skip_ any data if the stream is not configured
 or the config file is not found.
 
+`tritond` can be run by simply calling it from the command line. For testing
+and/or debugging, it can be run in verbose mode and with its output directed to stdout or a file e.g.
+
+    tritond -v --skip-kinesis  # writes verbose logs and writes events to stdout
+
+    tritond -cc --skip-kinesis --output_file test_output.txt
+
 Once `tritond` is running, usage follows the basic write pattern:
 
     import triton
