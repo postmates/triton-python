@@ -20,8 +20,10 @@ import os
 import time
 from collections import defaultdict
 import msgpack
+import json
 
 import zmq
+import pystatsd
 
 from triton import nonblocking_stream
 from triton.stream import get_stream
@@ -38,10 +40,19 @@ MAX_QUEUED_MESSAGES = 3500
 # Batch writes to Kinesis; collect messages for this long then write
 POLL_LOOP_TIMEOUT_MS = 100
 
+# See https://github.com/postmates/pystatsd for statsd configuration
+# Note that pystatsd writes raise no exception if no statsd server is running
+STATSD_PREFIX = 'tritond.'
+STATSD_EVENTCOUNT = STATSD_PREFIX + "eventcount."
+STATSD_LOOPTIME = STATSD_PREFIX + "write_loop.timing"
+
 log = logging.getLogger("triton.d")
 
 _triton_config = None
 _streams = dict()
+
+# version byte in our meta struct for JSON meta.
+META_STRUCT_VERSION_JSON = 0x7B
 
 
 def setup_logging(options):
@@ -73,6 +84,35 @@ def get_triton_config():
     return _triton_config
 
 
+def check_meta_version(meta):
+    value, = struct.unpack(">B", meta[0])
+    if value not in (
+        nonblocking_stream.META_STRUCT_VERSION, META_STRUCT_VERSION_JSON
+    ):
+        raise ValueError(value)
+    return value
+
+
+def get_header_data(event_meta, version):
+    if version == nonblocking_stream.META_STRUCT_VERSION:
+        # See nonblocking_stream.network for how this is packed.
+        _, stream_name, partition_key = struct.unpack(
+            nonblocking_stream.META_STRUCT_FMT, event_meta)
+    elif version == META_STRUCT_VERSION_JSON:
+        try:
+            meta_data = json.loads(event_meta)
+        except Exception:
+            raise ValueError('Cannot Parse Meta JSON')
+        try:
+            stream_name = meta_data['stream_name']
+            partition_key = meta_data['partition_key']
+        except Exception:
+            raise ValueError('Cannot Parse Meta JSON')
+    else:
+        raise ValueError('Incorrect meta version')
+    return stream_name, partition_key
+
+
 def load_or_get_stream(stream_name):
     try:
         return _streams[stream_name]
@@ -100,6 +140,10 @@ def _write_messages_to_streams(waiting_messages):
                     'list_of_messages': list_of_messages
                 }
             )
+        pystatsd.increment(
+            STATSD_EVENTCOUNT + stream_name,
+            len(list_of_messages)
+        )
 
 
 def _write_messages_to_file(waiting_messages, file_obj):
@@ -198,24 +242,24 @@ def main():
                 continue
 
             try:
-                nonblocking_stream.check_meta_version(event_meta)
+                version = check_meta_version(event_meta)
+                stream_name, partition_key = get_header_data(
+                    event_meta, version)
             except ValueError:
                 log.warning("Failed to decode event due to version mismatch")
                 continue
 
-            # See nonblocking_stream.network for how this is packed.
-            _, stream_name, partition_key = struct.unpack(
-                nonblocking_stream.META_STRUCT_FMT, event_meta)
             waiting_messages[stream_name].append({
                 'Data': event_data,
                 'PartitionKey': partition_key
             })
 
+        time_delta_ms = (time.time() - last_write) * 1000
         if (
             len(waiting_messages) > 0
             and
             (
-                ((time.time() - last_write) * 1000 > POLL_LOOP_TIMEOUT_MS)
+                (time_delta_ms > POLL_LOOP_TIMEOUT_MS)
                 or not continue_running[0]
             )
         ):
@@ -226,6 +270,7 @@ def main():
 
             waiting_messages = defaultdict(list)
             last_write = time.time()
+            pystatsd.timing(STATSD_LOOPTIME, time_delta_ms)
 
     collector_sock.close(0)
 

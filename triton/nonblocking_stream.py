@@ -14,15 +14,13 @@ import logging
 import threading
 import struct
 import atexit
-import time
-import decimal
-import datetime
 
 import zmq
 import msgpack
 
-from . import errors
-from . import config
+from triton import errors
+from triton import config
+from triton.encoding import msgpack_encode_default
 
 log = logging.getLogger(__name__)
 
@@ -35,20 +33,9 @@ MAX_QUEUED_MESSAGES = 3500
 # being told to exit.
 LINGER_SHUTDOWN_MSECS = 3000
 
-META_STRUCT_FMT = "!B64p64p"
-
-# We're going to include a version byte in our meta struct for future
-# upgrading.  This is very quickly getting into the kind of bit packing I
-# wanted to avoid for a logging infrastructure, but the performance gain is
-# hard to ignore.
+# version byte in our meta struct for future upgrading.
 META_STRUCT_VERSION = 0x4
-
-
-def check_meta_version(meta):
-    value, = struct.unpack(">B", meta[0])
-    if value != META_STRUCT_VERSION:
-        raise ValueError(value)
-
+META_STRUCT_FMT = "!B64p64p"
 
 threadLocal = threading.local()
 
@@ -149,21 +136,5 @@ def close():
         threadLocal.zmq_socket = None
 
     _zmq_context = None
-
-
-def msgpack_encode_default(obj):
-    """Extra encodings for python types into msgpack
-
-    These are attempted if our normal serialization fails.
-    """
-    if isinstance(obj, decimal.Decimal):
-        return str(obj)
-    if isinstance(obj, datetime.datetime):
-        return time.mktime(obj.utctimetuple())
-    if isinstance(obj, datetime.date):
-        return obj.strftime("%Y-%m-%d")
-
-    raise TypeError("Unknown type: %r" % (obj,))
-
 
 atexit.register(close)

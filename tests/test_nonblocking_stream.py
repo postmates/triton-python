@@ -1,5 +1,7 @@
 from testify import *
+import mock
 
+import json
 import msgpack
 import struct
 import time
@@ -13,9 +15,16 @@ import tempfile
 from collections import defaultdict
 
 from triton import nonblocking_stream, config
+from triton.encoding import msgpack_encode_default
 
 TEST_LOGS_BASE_DIRECTORY_SLUG = 'test_logs'
 TEST_TRITON_ZMQ_PORT = 3517  # in case tritond is running
+
+
+class Point(object):
+
+    def __init__(self, lat, lng):
+        self.coords = (lat, lng)
 
 
 def generate_test_data(primary_key='my_key'):
@@ -32,20 +41,53 @@ def generate_messy_test_data(primary_key='my_key'):
         'value': True,
         'time': datetime.datetime.now(),
         'date': datetime.date.today(),
-        'pi': decimal.Decimal('3.14')
+        'pi': decimal.Decimal('3.14'),
+        'point': Point(-122.42083, 37.75512)
     }
     return data
 
 
 def generate_transmitted_record(data, stream_name='test_stream'):
     message_data = msgpack.packb(
-        data, default=nonblocking_stream.msgpack_encode_default)
+        data, default=msgpack_encode_default)
 
     meta_data = struct.pack(
         nonblocking_stream.META_STRUCT_FMT,
         nonblocking_stream.META_STRUCT_VERSION,
         stream_name,
         data['pkey'])
+    return meta_data, message_data
+
+
+def generate_transmitted_record_json(data, stream_name='test_stream'):
+    message_data = msgpack.packb(
+        data, default=msgpack_encode_default)
+
+    meta_data = json.dumps(dict(
+        stream_name=stream_name,
+        partition_key=data['pkey']
+    ))
+
+    return meta_data, message_data
+
+
+def _serialize_context(self, data):
+    # mock serializer for JSON header
+    if len(self._partition_key(data)) > 64:
+        raise ValueError("Partition Key Too Long")
+
+    meta_data = json.dumps(dict(
+        stream_name=self.name,
+        partition_key=data['pkey']
+    ))
+
+    try:
+        message_data = msgpack.packb(data)
+    except TypeError:
+        # If we fail to serialize our context, we can try again with an
+        # enhanced packer (it's slower though)
+        message_data = msgpack.packb(data, default=msgpack_encode_default)
+
     return meta_data, message_data
 
 
@@ -97,11 +139,14 @@ class NonblockingStreamTest(TestCase):
         sent_data = msgpack.unpackb(mock_sent_message_data)
         assert_equal(
             sent_data['time'],
-            time.mktime(test_data['time'].utctimetuple()))
+            test_data['time'].isoformat(' '))
         assert_equal(
             sent_data['date'],
             test_data['date'].strftime("%Y-%m-%d"))
         assert_equal(sent_data['pi'], str(test_data['pi']))
+        assert_equal(
+            sent_data['point'],
+            str(test_data['point'].coords))
 
 
 class NonblockingStreamEndToEnd(TestCase):
@@ -181,3 +226,23 @@ class NonblockingStreamEndToEnd(TestCase):
                 received_data = (decode_debug_data(output_file))
             assert_truthy(stream_name in received_data)
             assert_equal(len(received_data[stream_name]), send_count)
+
+    def test_end_to_end_json_header(self):
+        stream_name = 'test_stream'
+        with mock.patch.object(
+            nonblocking_stream.NonblockingStream,
+            '_serialize_context',
+            new=_serialize_context
+        ):
+            test_stream = nonblocking_stream.NonblockingStream(
+                stream_name, 'pkey')
+            for i in range(10):
+                test_stream.put(**generate_test_data())
+            time.sleep(1)
+            assert_truthy(os.path.exists(self.log_file))
+            if os.path.exists(self.log_file):
+                with open(self.log_file, 'rb') as output_file:
+                    received_data = (decode_debug_data(output_file))
+                assert_truthy(stream_name in received_data)
+                if stream_name in received_data:
+                    assert_equal(len(received_data[stream_name]), 10)

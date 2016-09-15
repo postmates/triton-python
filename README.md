@@ -94,6 +94,13 @@ The `tritond` uses the same `triton.yaml` files to configure triton streams;
 and will _log errors and skip_ any data if the stream is not configured
 or the config file is not found.
 
+`tritond` can be run by simply calling it from the command line. For testing
+and/or debugging, it can be run in verbose mode and with its output directed to stdout or a file e.g.
+
+    tritond -v --skip-kinesis  # writes verbose logs and writes events to stdout
+
+    tritond -cc --skip-kinesis --output_file test_output.txt
+
 Once `tritond` is running, usage follows the basic write pattern:
 
     import triton
@@ -177,19 +184,23 @@ Or using the API, something like:
 
 ## Development
 
-You should be able to configuration your development environment using make:
+You should be able to configure your development environment using make:
 
-    ~/Projects/Project $ make dev
+    ~/python-triton $ make dev
+
+You will likely need to install system libraries as well:
+
+    ~/python-triton $ sudo apt-get install libsnappy-dev libzmq-dev
 
 The tests should all work:
 
-    ~/Projects/Project $ make test
+    ~/python-triton $ make test
     .
     PASSED.  1 test / 1 case: 1 passed, 0 failed.  (Total test time 0.00s)
 
 If you need to debug your application with ipython:
 
-    ~/Projects/Project $ make shell
+    ~/python-triton $ make shell
     Python 2.7.3 (default, Apr 27 2012, 21:31:10)
     Type "copyright", "credits" or "license" for more information.
 
