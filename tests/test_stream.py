@@ -1,6 +1,8 @@
 from testify import *
 import base64
 import time
+import datetime
+import decimal
 import random
 
 import msgpack
@@ -16,6 +18,24 @@ def generate_raw_record():
     raw_record = {'SequenceNumber': 1, 'Data': data}
 
     return raw_record
+
+
+def generate_messy_test_data(primary_key='my_key'):
+    data = {
+        'pkey': primary_key,
+        'value': True,
+        'time': datetime.datetime.now(),
+        'date': datetime.date.today(),
+        'pi': decimal.Decimal('3.14'),
+        'point': Point(-122.42083, 37.75512)
+    }
+    return data
+
+
+class Point(object):
+
+    def __init__(self, lat, lng):
+        self.coords = (lat, lng)
 
 
 class RecordTest(TestCase):
@@ -239,6 +259,35 @@ class StreamTest(TestCase):
         assert_equal(seq_num, 1)
         assert_equal(shard_id, '0001')
 
+    def test_put_hard_to_encode_data(self):
+        c = turtle.Turtle()
+
+        mock_sent_message_data = list()
+
+        def put_record(*args):
+            mock_sent_message_data.append(args[1])
+            return {'ShardId': '0001', 'SequenceNumber': 1}
+
+        c.put_record = put_record
+
+        s = stream.Stream(c, 'test_stream', 'pkey')
+
+        test_data = generate_messy_test_data()
+        s.put(**test_data)
+
+        sent_data = msgpack.unpackb(mock_sent_message_data[0])
+
+        assert_equal(
+            sent_data['time'],
+            test_data['time'].isoformat(' '))
+        assert_equal(
+            sent_data['date'],
+            test_data['date'].strftime("%Y-%m-%d"))
+        assert_equal(sent_data['pi'], str(test_data['pi']))
+        assert_equal(
+            sent_data['point'],
+            str(test_data['point'].coords))
+
     def test_put_fail(self):
         c = turtle.Turtle()
 
@@ -266,6 +315,40 @@ class StreamTest(TestCase):
         shard_id, seq_num = resp[0]
         assert_equal(seq_num, 1)
         assert_equal(shard_id, '0001')
+
+    def test_put_many_hard_to_encode(self):
+        c = turtle.Turtle()
+
+        mock_sent_message_data = list()
+
+        def put_records(*args, **kwargs):
+            mock_sent_message_data.extend(args[0])
+            return {'Records': [
+                {'ShardId': '0001', 'SequenceNumber': n}
+                for n in range(len(args[0]))
+            ]}
+
+        c.put_records = put_records
+
+        s = stream.Stream(c, 'test stream', 'value')
+
+        test_data = generate_messy_test_data()
+
+        resp = s.put_many([test_data, ] * 2)
+        assert_equal(len(resp), 2)
+
+        sent_data = msgpack.unpackb(mock_sent_message_data[1]['Data'])
+
+        assert_equal(
+            sent_data['time'],
+            test_data['time'].isoformat(' '))
+        assert_equal(
+            sent_data['date'],
+            test_data['date'].strftime("%Y-%m-%d"))
+        assert_equal(sent_data['pi'], str(test_data['pi']))
+        assert_equal(
+            sent_data['point'],
+            str(test_data['point'].coords))
 
     def test_put_many_gt_500(self):
         c = turtle.Turtle()
