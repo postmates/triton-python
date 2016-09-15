@@ -1,5 +1,7 @@
 from testify import *
+import mock
 
+import json
 import msgpack
 import struct
 import time
@@ -47,6 +49,38 @@ def generate_transmitted_record(data, stream_name='test_stream'):
         nonblocking_stream.META_STRUCT_VERSION,
         stream_name,
         data['pkey'])
+    return meta_data, message_data
+
+
+def generate_transmitted_record_json(data, stream_name='test_stream'):
+    message_data = msgpack.packb(
+        data, default=msgpack_encode_default)
+
+    meta_data = json.dumps(dict(
+        stream_name=stream_name,
+        partition_key=data['pkey']
+    ))
+
+    return meta_data, message_data
+
+
+def _serialize_context(self, data):
+    # mock serializer for JSON header
+    if len(self._partition_key(data)) > 64:
+        raise ValueError("Partition Key Too Long")
+
+    meta_data = json.dumps(dict(
+        stream_name=self.name,
+        partition_key=data['pkey']
+    ))
+
+    try:
+        message_data = msgpack.packb(data)
+    except TypeError:
+        # If we fail to serialize our context, we can try again with an
+        # enhanced packer (it's slower though)
+        message_data = msgpack.packb(data, default=msgpack_encode_default)
+
     return meta_data, message_data
 
 
@@ -182,3 +216,23 @@ class NonblockingStreamEndToEnd(TestCase):
                 received_data = (decode_debug_data(output_file))
             assert_truthy(stream_name in received_data)
             assert_equal(len(received_data[stream_name]), send_count)
+
+    def test_end_to_end_json_header(self):
+        stream_name = 'test_stream'
+        with mock.patch.object(
+            nonblocking_stream.NonblockingStream,
+            '_serialize_context',
+            new=_serialize_context
+        ):
+            test_stream = nonblocking_stream.NonblockingStream(
+                stream_name, 'pkey')
+            for i in range(10):
+                test_stream.put(**generate_test_data())
+            time.sleep(1)
+            assert_truthy(os.path.exists(self.log_file))
+            if os.path.exists(self.log_file):
+                with open(self.log_file, 'rb') as output_file:
+                    received_data = (decode_debug_data(output_file))
+                assert_truthy(stream_name in received_data)
+                if stream_name in received_data:
+                    assert_equal(len(received_data[stream_name]), 10)
