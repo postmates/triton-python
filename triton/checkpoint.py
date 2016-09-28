@@ -104,7 +104,6 @@ class TritonCheckpointer(object):
             )
             try:
                 sequence_number = curs.fetchone()
-                log.info(sequence_number)
                 if sequence_number is None:
                     return  # no checkpoint, we're done
                 return sequence_number[0]
