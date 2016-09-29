@@ -4,26 +4,54 @@ import logging
 import psycopg2.pool
 import time
 
+from triton import errors
+
 log = logging.getLogger(__name__)
 
 
 triton_dsn = os.environ.get('TRITON_DB')
+triton_client_name = os.environ.get('TRITON_CLIENT_NAME')
 postal_rds_pool = None
+
+CREATE_TABLE_STMT = """
+CREATE TABLE IF NOT EXISTS triton_checkpoint (
+    client VARCHAR(255) NOT NULL,
+    stream VARCHAR(255) NOT NULL,
+    shard VARCHAR(255) NOT NULL,
+    seq_num VARCHAR(255) NOT NULL,
+    updated INTEGER NOT NULL,
+    PRIMARY KEY (client, stream, shard))
+"""
 
 
 def get_triton_connection_pool():
     global postal_rds_pool
     if postal_rds_pool is None:
+        if not triton_dsn:
+            raise errors.TritonCheckpointError(
+                'triton_dsn not configured with TRITON_DB evn variable')
         postal_rds_pool = psycopg2.pool.ThreadedConnectionPool(
             1, 20, triton_dsn
         )
     return postal_rds_pool
 
 
+def init_db(db_pool_function=get_triton_connection_pool):
+    """Create the required table in DB if not already there"""
+    db_pool = db_pool_function()
+    conn = db_pool.getconn()
+    curs = conn.cursor()
+    curs.execute(CREATE_TABLE_STMT)
+    conn.commit()
+
+
 class TritonCheckpointer(object):
     """Handles checkpoints for triton"""
 
-    def __init__(self, client_name, stream_name):
+    def __init__(self, stream_name, client_name=triton_client_name):
+        if not client_name:
+            raise errors.TritonCheckpointError(
+                'client_name is required to create a TritonCheckpointer')
         self.client_name = client_name
         self.stream_name = stream_name
         self.db_pool = get_triton_connection_pool()

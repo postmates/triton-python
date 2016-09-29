@@ -9,6 +9,7 @@ from boto.exception import BotoServerError
 import boto.regioninfo
 
 from triton import errors
+from triton.checkpoint import TritonCheckpointer
 from triton.encoding import msgpack_encode_default
 
 
@@ -19,6 +20,7 @@ KINESIS_MAX_RETRYS = 2  # Kinesis 'InternalFailure' retry attempts
 ITER_TYPE_LATEST = 'LATEST'
 ITER_TYPE_ALL = 'TRIM_HORIZON'
 ITER_TYPE_FROM_SEQNUM = 'AFTER_SEQUENCE_NUMBER'
+ITER_TYPE_FROM_CHECKPOINT = 'FROM_CHECKPOINT'
 
 log = logging.getLogger(__name__)
 
@@ -66,9 +68,26 @@ class StreamIterator(object):
         self._empty = True
         self.behind_latest_secs = None
 
+        self._checkpointer = None
+        self.last_seq_num = None
+
+    @property
+    def checkpointer(self):
+        if self._checkpointer is None:
+            self._checkpointer = TritonCheckpointer(self.stream.name)
+        return self._checkpointer
+
+    def checkpoint(self):
+        if self.last_seq_num is not None:
+            self.checkpointer.checkpoint(self.shard_id, self.last_seq_num)
+
     @property
     def iter_value(self):
         if self._iter_value is None:
+            if self.iterator_type == ITER_TYPE_FROM_CHECKPOINT:
+                self.seq_num = self.checkpointer.last_sequence_number(
+                    self.shard_id)
+                self.iterator_type = ITER_TYPE_FROM_CHECKPOINT
             log.info(
                 "Creating iterator %r", (
                     self.stream.name, self.shard_id,
@@ -125,7 +144,10 @@ class StreamIterator(object):
             self.fill()
 
         try:
-            return self.records.pop(0)
+            rec = self.records.pop(0)
+            self.last_seq_num = rec.seq_num
+            return rec
+
         except IndexError:
             self._empty = True
             raise StopIteration
@@ -146,6 +168,9 @@ class CombinedStreamIterator(object):
         self._fill_iterators = set()
         self._running = True
         self._last_wait = None
+
+        self.last_iterator = None
+        self.last_seq_num = None
 
         self._records = []
 
@@ -171,6 +196,7 @@ class CombinedStreamIterator(object):
             self._fill_iterators.update(set(self.iterators))
 
         iter_to_fill = self._fill_iterators.pop()
+        self.last_iterator = iter_to_fill
         log.debug("Checking stream (%s, %s) ", iter_to_fill.stream.name,
                   iter_to_fill.shard_id)
         self._records += list(iter_to_fill)
@@ -186,7 +212,9 @@ class CombinedStreamIterator(object):
         # 4. Don't load more records after stop() is called
         while True:
             try:
-                return self._records.pop(0)
+                rec = self._records.pop(0)
+                self.last_seq_num = rec.seq_num
+                return rec
             except IndexError:
                 if not self._running:
                     raise StopIteration
@@ -195,6 +223,17 @@ class CombinedStreamIterator(object):
 
     def stop(self):
         self._running = False
+
+    def checkpoint(self):
+        for this_iterator in set(self.iterators):
+            if this_iterator != self.last_iterator:
+                # we've already processed all data pulled from this iterator
+                this_iterator.checkpoint()
+            else:
+                # we could be in the middle of processing this data
+                # checkpoint only as far as the data retrieved via next()
+                this_iterator.checkpointer.checkpoint(
+                    this_iterator.shard_id, self.last_seq_num)
 
 
 class Stream(object):
@@ -339,6 +378,10 @@ class Stream(object):
     def build_iterator_from_latest(self, shard_nums=None):
         shard_ids = self._select_shard_ids(shard_nums)
         return self._build_iterator(ITER_TYPE_LATEST, shard_ids, None)
+
+    def build_iterator_from_checkpoint(self, shard_nums=None):
+        shard_ids = self._select_shard_ids(shard_nums)
+        return self._build_iterator(ITER_TYPE_FROM_CHECKPOINT, shard_ids, None)
 
     def _build_iterator(self, iterator_type, shard_ids, seq_num):
         all_iters = []

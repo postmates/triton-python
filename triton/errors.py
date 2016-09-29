@@ -41,3 +41,8 @@ class KinesisPutManyError(Error):
     def __init__(self, reason, failed_data=None, *args):
         super(KinesisPutManyError, self).__init__(reason, *args)
         self.failed_data = failed_data
+
+
+class TritonCheckpointError(Error):
+    """Error of misconfiguration of Triton Checkpointing"""
+    pass

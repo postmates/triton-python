@@ -164,6 +164,44 @@ and the second worker would do:
 Note that these are 'share numbers', not shard ids. These are indexes into the
 actual shard list.
 
+### Checkpointing
+
+Triton supports checkpointing to a DB so that processing can start where
+previous processing left off. It requires a postgresDB available.
+To specify the DB location, set the ENV variable `TRITON_DB` to the DSN
+of the postgres DB, e.g.
+
+    export TRITON_DB="dbname=db_name port=5432 host=www.dbhosting.com user=user_name password=password"
+
+Attempting to checkpoint without this DB being configured will raise a
+`TritonCheckpointError` exception.
+
+The DB also needs to have a specific table created; calling the following will initialized the table:
+
+    triton.checkpoint.init_db()
+
+Triton checkpointing also requires a unique client name, since the basic
+assumption is that the checkpoint DB will be shared. The client name is specified
+by the ENV variable `TRITON_CLIENT_NAME`.
+
+
+Once configured, checkpointing can be used simply by calling the `checkpoint`
+method on a stream iterator.
+
+For example:
+
+    s = triton.get_stream('my_stream', c)
+    i = s.build_iterator_from_checkpoint()
+
+    for ctr in range(1):
+        rec = i.next()
+        print rec.data
+
+    i.checkpoint()
+
+The next time this code is run, it will pick up from where the last run left off.
+
+
 ### Consuming Archives
 
 Triton data is typically archived to S3. Using the triton command, you can view that data:
