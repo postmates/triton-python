@@ -96,8 +96,6 @@ class StreamIterator(object):
                     self.shard_id)
                 if self.seq_num is None:
                     self.iterator_type = self.fallback_iterator_type
-                else:
-                    self.iterator_type = ITER_TYPE_FROM_CHECKPOINT
             log.info(
                 "Creating iterator %r", (
                     self.stream.name, self.shard_id,
