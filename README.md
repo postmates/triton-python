@@ -10,9 +10,11 @@ maintains the records for 24 hours. These streams come in multiple shards
 (defined by the adminstrator).
 
 The tooling provided here builds on top of the boto library to make real-world
-work with these streams and record easier. This is preference to using the
+work with these streams and record easier. This is preferential to using the
 Amazon provided KCL (Kinesis Client Library) which is Java-based, or the python
 bindings built on top of KCL, because it isn't very pythonic.
+
+This tooling also provides built in support for checkpointing, which allows a client to pick up processing records wherever it stopped last. The raw kinesis libraries require the client to take care of the checkpointing process itself.
 
 ### Configuration
 
@@ -163,6 +165,46 @@ and the second worker would do:
 
 Note that these are 'share numbers', not shard ids. These are indexes into the
 actual shard list.
+
+### Checkpointing
+
+Triton supports checkpointing to a DB so that processing can start where
+previous processing left off. It requires a postgresDB available.
+To specify the DB location, set the ENV variable `TRITON_DB` to the DSN
+of the postgres DB, e.g.
+
+    export TRITON_DB="dbname=db_name port=5432 host=www.dbhosting.com user=user_name password=password"
+
+Attempting to checkpoint without this DB being configured will raise a
+`TritonCheckpointError` exception.
+
+The DB also needs to have a specific table created; calling the following will initialized the table (this call is safe to repeat; it is a no-op if the table already exists):
+
+    triton.checkpoint.init_db()
+
+Triton checkpointing also requires a unique client name, since the basic
+assumption is that the checkpoint DB will be shared. The client name is specified
+by the ENV variable `TRITON_CLIENT_NAME`. 
+Attempting to checkpoint without this ENV variable will also raise a
+`TritonCheckpointError` exception.
+
+
+Once configured, checkpointing can be used simply by calling the `checkpoint`
+method on a stream iterator.
+
+For example:
+
+    s = triton.get_stream('my_stream', c)
+    i = s.build_iterator_from_checkpoint()
+
+    for ctr in range(1):
+        rec = i.next()
+        print rec.data
+
+    i.checkpoint()
+
+The next time this code is run, it will pick up from where the last run left off.
+
 
 ### Consuming Archives
 

@@ -1,3 +1,7 @@
+triton (0.0.12)
+
+  * Now supports checkpointing to DB
+
 triton (0.0.11)
 
   * Default serializer applies to all data, not just data sent to tritond
