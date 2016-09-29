@@ -54,13 +54,20 @@ class StreamIterator(object):
         shard_id - Which shard we're reading from (shardId-00001)
         iterator_type - How we're iterating, like 'LATEST' or 'TRIM_HORIZON'
         seq_num - For 'AFTER_SEQUENCE_NUMBER' type, tells us where to start.
+        fallback_iterator_type - For 'AFTER_SEQUENCE_NUMBER', if there is no
+            checkpoint availible, create an iterator with this iterator_type
+            instead
     """
 
-    def __init__(self, stream, shard_id, iterator_type, seq_num=None):
+    def __init__(
+        self, stream, shard_id, iterator_type,
+        seq_num=None, fallback_iterator_type=ITER_TYPE_ALL
+    ):
         self.stream = stream
         self.shard_id = shard_id
         self.iterator_type = iterator_type
         self.seq_num = seq_num
+        self.fallback_iterator_type = fallback_iterator_type
 
         self._iter_value = None
         self.records = []
@@ -87,7 +94,10 @@ class StreamIterator(object):
             if self.iterator_type == ITER_TYPE_FROM_CHECKPOINT:
                 self.seq_num = self.checkpointer.last_sequence_number(
                     self.shard_id)
-                self.iterator_type = ITER_TYPE_FROM_CHECKPOINT
+                if self.seq_num is None:
+                    self.iterator_type = self.fallback_iterator_type
+                else:
+                    self.iterator_type = ITER_TYPE_FROM_CHECKPOINT
             log.info(
                 "Creating iterator %r", (
                     self.stream.name, self.shard_id,

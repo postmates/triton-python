@@ -3,17 +3,10 @@ from testify import *
 import tempfile
 import sqlite3
 import mock
-import logging
 import msgpack
 import base64
 
 from triton import checkpoint, stream
-
-level = logging.DEBUG
-log_format = "%(asctime)s %(levelname)s:%(name)s: %(message)s"
-logging.basicConfig(level=level, format=log_format)
-
-log = logging.getLogger(__name__)
 
 CLIENT_NAME = 'test_client'
 
@@ -83,12 +76,21 @@ def generate_raw_record(seq_no):
 
 
 def get_records(n, offset=0, *args, **kwargs):
+    n = int(n)
+    offset = int(offset)
     records = [generate_raw_record(str(i + offset)) for i in range(n)]
     return {
         'NextShardIterator': n + offset,
         'MillisBehindLatest': 0,
         'Records': records
     }
+
+
+def get_batches_of_10_records(
+    iter_val, *args, **kwargs
+):
+    recs = get_records(10, iter_val)
+    return recs
 
 
 class StreamIteratorCheckpointTest(TestCase):
@@ -129,7 +131,7 @@ class StreamIteratorCheckpointTest(TestCase):
                 assert_truthy(val.seq_num == last_chkpt_seqno)
 
     def test_combined_iterator_checkpoint(self):
-        stream_name = 'test1'
+        stream_name = 'test2'
         shard_id0 = 'shardId-000000000000'
         shard_id1 = 'shardId-000000000001'
         pool_patch = 'triton.checkpoint.get_triton_connection_pool'
@@ -138,13 +140,6 @@ class StreamIteratorCheckpointTest(TestCase):
             with mock.patch(chkpt_patch, new=TritonCheckpointerTest):
                 s = turtle.Turtle()
                 s.name = stream_name
-
-                def get_batches_of_10_records(
-                    iter_val, *args, **kwargs
-                ):
-                    recs = get_records(10, iter_val)
-                    return recs
-
                 s.conn.get_records = get_batches_of_10_records
 
                 i1 = stream.StreamIterator(
@@ -168,7 +163,42 @@ class StreamIteratorCheckpointTest(TestCase):
                 assert_truthy(val.seq_num in last_chkpts)
                 # because combined iterator uses a set of iterators,
                 # we neet to test both cases
-                if val.seq_num > '100':
+                if int(val.seq_num) > 100:
                     assert_truthy('9' in last_chkpts)
                 else:
                     assert_truthy('109' in last_chkpts)
+
+    def test_stream_get_iterator_from_checkpoint(self):
+        stream_name = 'test3'
+        shard_id = 'shardId-000000000000'
+        pool_patch = 'triton.checkpoint.get_triton_connection_pool'
+        chkpt_patch = 'triton.stream.TritonCheckpointer'
+        with mock.patch(pool_patch, new=lambda: self.pool):
+            with mock.patch(chkpt_patch, new=TritonCheckpointerTest):
+                c = turtle.Turtle()
+                s = stream.Stream(c, stream_name, 'p_key')
+                s._shard_ids = [shard_id, ]
+
+                s.conn.get_records = get_batches_of_10_records
+
+                def get_shard_iterator(*args, **kwargs):
+                    return {'ShardIterator': 0}
+
+                s.conn.get_shard_iterator = get_shard_iterator
+
+                ci = s.build_iterator_from_checkpoint()
+                for j in range(10):
+                    val = ci.next()
+                i = ci.iterators[0]
+                assert_truthy(i.iterator_type == i.fallback_iterator_type)
+                ci.checkpoint()
+
+                ci = s.build_iterator_from_checkpoint()
+                i = ci.iterators[0]
+                i._iter_value = i.checkpointer.last_sequence_number(
+                    shard_id)
+                assert_truthy(val.seq_num == i._iter_value)
+                for j in range(10):
+                    val = ci.next()
+                assert_truthy(
+                    i.iterator_type == stream.ITER_TYPE_FROM_CHECKPOINT)
