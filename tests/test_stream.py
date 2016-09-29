@@ -12,12 +12,16 @@ from triton import errors
 from boto.exception import BotoServerError
 
 
-def generate_raw_record():
+def generate_raw_record(n=1):
     data = base64.b64encode(msgpack.packb({'value': True}))
 
-    raw_record = {'SequenceNumber': 1, 'Data': data}
+    raw_record = {'SequenceNumber': n, 'Data': data}
 
     return raw_record
+
+
+def generate_record(n=1):
+    return stream.Record.from_raw_record(0, generate_raw_record(n))
 
 
 def generate_messy_test_data(primary_key='my_key'):
@@ -121,7 +125,7 @@ class StreamIteratorTest(TestCase):
         s = turtle.Turtle()
         i = stream.StreamIterator(s, 0, stream.ITER_TYPE_LATEST)
 
-        records = [generate_raw_record(), generate_raw_record()]
+        records = [generate_record(), generate_record()]
         i.records += records
         i._empty = False
 
@@ -161,7 +165,8 @@ class CombinedStreamIteratorTest(TestCase):
         s = turtle.Turtle()
         s.name = 'test stream'
         i = stream.StreamIterator(s, 0, stream.ITER_TYPE_LATEST)
-        i.records = [1]
+        r = generate_record()
+        i.records = [r, ]
         i._empty = False
 
         c = stream.CombinedStreamIterator([i])
@@ -169,18 +174,20 @@ class CombinedStreamIteratorTest(TestCase):
         c._running = False
 
         records = list(c)
-        assert_equal(records, [1])
+        assert_equal(records, [r, ])
 
     def test_multiple(self):
         s = turtle.Turtle()
         s.name = 'test stream'
 
+        sent_records = [generate_record(1), generate_record(2)]
+
         i1 = stream.StreamIterator(s, 0, stream.ITER_TYPE_LATEST)
-        i1.records = [1]
+        i1.records = [sent_records[0], ]
         i1._empty = False
 
         i2 = stream.StreamIterator(s, 1, stream.ITER_TYPE_LATEST)
-        i2.records = [2]
+        i2.records = [sent_records[1], ]
         i2._empty = False
 
         c = stream.CombinedStreamIterator([i1, i2])
@@ -192,7 +199,7 @@ class CombinedStreamIteratorTest(TestCase):
 
         records = list(c)
 
-        assert_equal(set(records), set([1, 2]))
+        assert_equal(set(records), set(sent_records))
 
 
 class StreamTest(TestCase):
