@@ -201,4 +201,4 @@ class StreamIteratorCheckpointTest(TestCase):
                 for j in range(10):
                     val = ci.next()
                 assert_truthy(
-                    i.iterator_type == stream.ITER_TYPE_FROM_CHECKPOINT)
+                    i.iterator_type == stream.ITER_TYPE_FROM_SEQNUM)
