@@ -389,9 +389,14 @@ class Stream(object):
         shard_ids = self._select_shard_ids(shard_nums)
         return self._build_iterator(ITER_TYPE_LATEST, shard_ids, None)
 
-    def build_iterator_from_checkpoint(self, shard_nums=None):
+    def build_iterator_from_checkpoint(
+        self, shard_nums=None, fallback_iterator_type=ITER_TYPE_ALL
+    ):
         shard_ids = self._select_shard_ids(shard_nums)
-        return self._build_iterator(ITER_TYPE_FROM_CHECKPOINT, shard_ids, None)
+        return self._build_iterator(
+            ITER_TYPE_FROM_CHECKPOINT, shard_ids, None,
+            fallback_iterator_type=fallback_iterator_type
+        )
 
     def _build_iterator(self, iterator_type, shard_ids, seq_num):
         all_iters = []
