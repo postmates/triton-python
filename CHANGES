@@ -1,3 +1,7 @@
+triton (0.0.13)
+
+  * Better control over checkpoint iterators on creation
+
 triton (0.0.12)
 
   * Now supports checkpointing to DB
