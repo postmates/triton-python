@@ -10,4 +10,3 @@ python-snappy
 pyzmq
 pyyaml
 psycopg2
--e git://github.com/postmates/pystatsd.git@2.0.0#egg=pystatsd
