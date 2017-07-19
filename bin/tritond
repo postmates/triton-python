@@ -114,9 +114,9 @@ def get_header_data(event_meta, version):
 
 
 def load_or_get_stream(stream_name):
-    try:
+    if stream_name in _streams:
         return _streams[stream_name]
-    except KeyError:
+    else:
         stream = get_stream(stream_name, get_triton_config())
         _streams[stream_name] = stream
         return stream
