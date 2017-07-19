@@ -7,3 +7,4 @@ env
 *.egg-info
 .DS_Store
 MANIFEST
+.cache
