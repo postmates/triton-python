@@ -405,6 +405,7 @@ class Stream(object):
 def connect_to_region(region_name, **kw_params):
     # NOTE(rhettg): current version of boto doesn't know about us-west-1 for
     # kinesis
+    # TODO(joe-astr): check if upgrading to boto3 solves this problem
     region = boto.regioninfo.RegionInfo(
         name=region_name,
         endpoint='kinesis.{}.amazonaws.com'.format(region_name),
