@@ -18,6 +18,11 @@ class TritonNotConfiguredError(Error):
     pass
 
 
+class InvalidConfigurationError(Error):
+    """"Indicates invalid config file"""
+    pass
+
+
 class StreamNotConfiguredError(Error):
     pass
 
