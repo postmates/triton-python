@@ -291,7 +291,6 @@ class Stream(object):
         return shard_ids
 
     def put(self, **kwargs):
-        #TODO: double-check this only puts one record
         pystatsd.increment(
             STATSD_PUT_ATTEMPT + self.name
         )
