@@ -29,6 +29,8 @@ log = logging.getLogger(__name__)
 # Note that pystatsd writes raise no exception if no statsd server is running
 STATSD_PREFIX = 'triton.stream.'
 STATSD_PUT_ATTEMPT = STATSD_PREFIX + "put_attempt."
+STATSD_PUT_SUCCESS = STATSD_PREFIX + "put_success."
+STATSD_PUT_FAILURE = STATSD_PREFIX + "put_failure"
 
 
 class Record(object):
@@ -290,6 +292,16 @@ class Stream(object):
 
         return shard_ids
 
+    def check_put_resp_pystatsd(resp):
+        if (resp is not None) and ('ShardId' in resp) and ('SequenceNumber' in resp):
+            pystatsd.increment(
+                STATSD_PUT_SUCCESS + self.name
+            )
+        else:
+            pystatsd.increment(
+                STATSD_PUT_FAILURE + self.name
+            )
+
     def put(self, **kwargs):
         pystatsd.increment(
             STATSD_PUT_ATTEMPT + self.name
@@ -306,6 +318,7 @@ class Stream(object):
             self.name, data,
             self._partition_key(kwargs)
         )
+        check_put_resp_pystatsd(resp)
 
         try:
             return resp['ShardId'], resp['SequenceNumber']
@@ -374,6 +387,7 @@ class Stream(object):
                 # ProvisionedThroughputExceededException and InternalFailure
                 # happen on a message by message basis.
                 # Check for individual failed messages and queue for retry
+                check_put_resp_pystatsd(r)
                 try:
                     resp_value.append((r['ShardId'], r['SequenceNumber']))
                 except KeyError:
