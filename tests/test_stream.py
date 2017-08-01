@@ -1,4 +1,5 @@
 from testify import *
+import mock
 import base64
 import time
 import datetime
@@ -262,9 +263,11 @@ class StreamTest(TestCase):
 
         s = stream.Stream(c, 'test stream', 'value')
 
-        shard_id, seq_num = s.put(value=0)
+        with mock.patch('pystatsd.increment') as increment:
+            shard_id, seq_num = s.put(value=0)
         assert_equal(seq_num, 1)
         assert_equal(shard_id, '0001')
+        increment.assert_called_with('triton.stream.put_attempt.test stream')
 
     def test_put_hard_to_encode_data(self):
         c = turtle.Turtle()
@@ -317,11 +320,13 @@ class StreamTest(TestCase):
 
         s = stream.Stream(c, 'test stream', 'value')
 
-        resp = s.put_many([dict(value=0)])
+        with mock.patch('pystatsd.increment') as increment:
+            resp = s.put_many([dict(value=0)])
 
         shard_id, seq_num = resp[0]
         assert_equal(seq_num, 1)
         assert_equal(shard_id, '0001')
+        increment.assert_called_with('triton.stream.put_attempt.test stream', 1)
 
     def test_put_many_hard_to_encode(self):
         c = turtle.Turtle()
