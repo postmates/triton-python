@@ -1,6 +1,7 @@
 .PHONY: all pep8 pyflakes clean dev
 
 GITIGNORES=$(shell cat .gitignore |tr "\\n" ",")
+VERSION=$(shell grep version triton/__init__.py |cut -d' ' -f3 |sed "s/\\'//g")
 
 all: pep8
 
@@ -38,4 +39,15 @@ devclean:
 	@rm -rf env
 
 clean:
-	@rm -rf build dist env
+	@rm -rf build dist env pystatsd-2.0.1-py2-none-any.whl
+
+docker-build-deps:
+	aws s3 cp s3://artifacts.postmates.com/postal/simple2/pystatsd/pystatsd-2.0.1-py2-none-any.whl .
+
+docker-build: docker-build-deps
+	@sed -i.bak '/pystatsd/d' cfg/requirements.txt
+	docker build -t quay.io/postmates/triton:$(VERSION) .
+	@mv cfg/requirements.txt.bak cfg/requirements.txt
+
+docker-push:
+	docker push quay.io/postmates/triton:$(VERSION)
