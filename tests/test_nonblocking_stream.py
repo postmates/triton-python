@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from testify import *
 import mock
 
@@ -46,6 +48,14 @@ def generate_messy_test_data(primary_key='my_key'):
     }
     return data
 
+def generate_unicode_data(primary_key='my_key'):
+    data = {
+        'pkey': primary_key,
+        'value': True,
+        'ascii_key': u'sømé_ünîcode_vàl',
+        u'ünîcødé_key': 'ascii_val'
+    }
+    return data
 
 def generate_transmitted_record(data, stream_name='test_stream'):
     message_data = msgpack.packb(
@@ -125,6 +135,18 @@ class NonblockingStreamTest(TestCase):
             .zmq_socket.send_multipart.calls[0][0][0])
         assert_equal(mock_sent_meta_data, meta_data)
         assert_equal(mock_sent_message_data, message_data)
+
+    def test_send_unicode_data(self):
+        s = nonblocking_stream.NonblockingStream('tést_unicode_stream', 'pkey')
+        test_data = generate_unicode_data()
+        s.put(**test_data)
+        meta_data, message_data = generate_transmitted_record(test_data)
+        mock_sent_meta_data, mock_sent_message_data = (
+            nonblocking_stream.threadLocal
+            .zmq_socket.send_multipart.calls[0][0][0])
+        assert_equal(mock_sent_meta_data, meta_data)
+        assert_equal(mock_sent_message_data, message_data)
+        #TODO: assert equal for data (see function below)
 
     def test_send_hard_to_encode_data(self):
         s = nonblocking_stream.NonblockingStream('test_stream', 'pkey')
