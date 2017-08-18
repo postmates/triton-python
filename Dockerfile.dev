@@ -1,0 +1,11 @@
+# vim: set syntax=dockerfile :
+
+FROM ubuntu
+
+RUN apt-get update && apt-get install -y python-setuptools python-dev python-pip build-essential libsnappy-dev libzmq-dev git
+
+COPY . /usr/local/src/python-triton
+
+RUN cd /usr/local/src/python-triton && pip install -r cfg/requirements.txt && pip install -e .
+
+CMD ["/bin/sleep", "7d"]
