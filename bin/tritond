@@ -156,8 +156,10 @@ def _write_messages_to_file(waiting_messages, file_obj):
         file_obj.writelines(message['Data'] for message in list_of_messages)
     file_obj.flush()
 
+
 def _pending_events(waiting_messages):
     return len(waiting_messages) > 0
+
 
 def _maybe_flush_events(waiting_messages, last_flush, output_file=None):
     """
@@ -178,6 +180,7 @@ def _maybe_flush_events(waiting_messages, last_flush, output_file=None):
         return (now, _flush_events(waiting_messages, output_file))
     else:
         return (last_flush, waiting_messages)
+
 
 def _flush_events(waiting_messages, output_file=None):
     """
@@ -203,6 +206,7 @@ def _flush_events(waiting_messages, output_file=None):
                 _write_messages_to_streams(waiting_messages)
 
     return defaultdict(list)
+
 
 def main():
     parser = argparse.ArgumentParser()
