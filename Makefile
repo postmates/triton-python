@@ -1,4 +1,4 @@
-.PHONY: all pep8 pyflakes clean dev
+.PHONY: all pep8 pyflakes clean dev test-drone
 
 GITIGNORES=$(shell cat .gitignore |tr "\\n" ",")
 
@@ -39,3 +39,8 @@ devclean:
 
 clean:
 	@rm -rf build dist env
+
+test-drone:
+	DRONE_BRANCH="$(shell git rev-parse --abbrev-ref HEAD)" \
+	DRONE_COMMIT_SHA="$(shell git rev-parse HEAD)" \
+	drone exec
