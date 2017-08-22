@@ -157,6 +157,57 @@ def _write_messages_to_file(waiting_messages, file_obj):
     file_obj.flush()
 
 
+def _pending_events(waiting_messages):
+    return len(waiting_messages) > 0
+
+
+def _maybe_flush_events(waiting_messages, last_flush, output_file=None):
+    """
+        Maybe publishes given events based on the configured publish interval.
+
+        Arguments:
+            waiting_messages : dict(string, list) - Events pending publication.
+            last_flush : time.time() - Timestamp of the last successful publication.
+            output_file : file_descriptor - File to flush to instead of Kinesis.  Optional, default = None.
+
+        Returns:
+            (time.time(), dict(string, list))
+    """
+    now = time.time()
+    time_delta_ms = (now - last_flush) * 1000
+
+    if (time_delta_ms > POLL_LOOP_TIMEOUT_MS):
+        return (now, _flush_events(waiting_messages, output_file))
+    else:
+        return (last_flush, waiting_messages)
+
+
+def _flush_events(waiting_messages, output_file=None):
+    """
+        Flushes per stream buffers contained in waiting_messages to
+        either Kinesis or the given output file.
+
+        Note - For now it is assumed this action always results in the events
+        being either written or dropped.  The day may come when this isn't the
+        case, as such, we return a value to represent unpublished events.
+
+        Arguments:
+            waiting_messages : dict(string, list) - Events pending publication.
+            output_file : file_descriptor - File to flush to instead of Kinesis.  Optional, default = None.
+
+        Returns:
+            dict(string, list)
+    """
+    if _pending_events(waiting_messages):
+        with pystatsd.Timer(STATSD_LOOPTIME):
+            if output_file is not None:
+                _write_messages_to_file(waiting_messages, output_file)
+            else:
+                _write_messages_to_streams(waiting_messages)
+
+    return defaultdict(list)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -183,17 +234,29 @@ def main():
     )
 
     options = parser.parse_args()
-
     setup_logging(options)
 
+    output_file = None
+    if options.skip_kinesis:
+        if options.output_file is None:
+            output_file = sys.stdout
+        else:
+            output_file = open(options.output_file, 'wb')
+
     continue_running = [True]
+    final_flush = [True]
+
+    def handle_sigint(signum, frame):
+        log.info("Exiting immediately.")
+        continue_running[0] = False
+        final_flush = [False]
 
     def handle_sigterm(signum, frame):
-        log.info("Exiting")
+        log.info("Exiting after all events have been flushed.")
         continue_running[0] = False
 
     signal.signal(signal.SIGTERM, handle_sigterm)
-    signal.signal(signal.SIGINT, handle_sigterm)
+    signal.signal(signal.SIGINT, handle_sigint)
 
     zmq_context = zmq.Context()
     poller = zmq.Poller()
@@ -204,12 +267,6 @@ def main():
     collector_sock.hwm = MAX_QUEUED_MESSAGES
     collector_sock.bind("tcp://%s" % collect_host)
     poller.register(collector_sock, zmq.POLLIN)
-
-    if options.skip_kinesis:
-        if options.output_file is None:
-            output_file = sys.stdout
-        else:
-            output_file = open(options.output_file, 'wb')
 
     last_write = time.time()
     waiting_messages = defaultdict(list)
@@ -254,25 +311,12 @@ def main():
                 'PartitionKey': partition_key
             })
 
-        time_delta_ms = (time.time() - last_write) * 1000
-        if (
-            len(waiting_messages) > 0
-            and
-            (
-                (time_delta_ms > POLL_LOOP_TIMEOUT_MS)
-                or not continue_running[0]
-            )
-        ):
-            if options.skip_kinesis:
-                _write_messages_to_file(waiting_messages, output_file)
-            else:
-                _write_messages_to_streams(waiting_messages)
-
-            waiting_messages = defaultdict(list)
-            last_write = time.time()
-            pystatsd.timing(STATSD_LOOPTIME, time_delta_ms)
+        last_write, waiting_messages = _maybe_flush_events(waiting_messages, last_write, output_file)
 
     collector_sock.close(0)
+
+    if final_flush[0]:
+        _flush_events(waiting_messages, output_file)
 
     sys.exit(0)
 
