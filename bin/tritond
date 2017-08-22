@@ -229,8 +229,8 @@ def main():
         default=None,
         help=
             """
-            Output file for incomeing data; otherwise output to stdout.
-            Only used with --skip-kinesis
+            Output file for incoming data; otherwise output to stdout.
+            Only used in conjunction with --skip-kinesis
             """
     )
 
