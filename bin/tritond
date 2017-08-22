@@ -221,16 +221,17 @@ def main():
         dest='skip_kinesis',
         action='store_true',
         default=False,
-        help="will skip sends to Kinesis; for debug purposess")
+        help="Skip publishing to Kinesis; for debug purposes.")
     parser.add_argument(
         '--output_file',
         dest='output_file',
         action='store',
         default=None,
-        help=(
-            'output file for incomeing data; otherwise output to stdout. ',
-            'Only used with --skip-kinesis'
-        )
+        help=
+            """
+            Output file for incoming data; otherwise output to stdout.
+            Only used in conjunction with --skip-kinesis
+            """
     )
 
     options = parser.parse_args()
