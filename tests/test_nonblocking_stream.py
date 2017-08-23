@@ -76,8 +76,8 @@ def generate_transmitted_record(data, stream_name='test_stream', partition_key='
     meta_data = struct.pack(
         nonblocking_stream.META_STRUCT_FMT,
         nonblocking_stream.META_STRUCT_VERSION,
-        stream_name,
-        data[partition_key])
+        stream_name.encode('utf-8'),
+        data[partition_key].encode('utf-8'))
     return meta_data, message_data
 
 
