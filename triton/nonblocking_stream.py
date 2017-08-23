@@ -10,6 +10,8 @@ It does this by sending the messageover ZeroMQ to tritond.
 Adapted from https://github.com/rhettg/BlueOx/blob/master/blueox/network.py
 
 """
+from __future__ import unicode_literals
+from builtins import str
 import logging
 import threading
 import struct
@@ -84,8 +86,8 @@ class NonblockingStream(object):
             raise ValueError("Partition Key Too Long")
 
         meta_data = struct.pack(META_STRUCT_FMT, META_STRUCT_VERSION,
-                                self.name,
-                                self._partition_key(data))
+                                self.name.encode('utf-8'),
+                                self._partition_key(data).encode('utf-8'))
         try:
             message_data = msgpack.packb(data)
         except TypeError:
