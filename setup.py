@@ -4,7 +4,7 @@
 import os
 import sys
 import glob
-from distutils.core import setup
+from setuptools import setup
 
 PACKAGES = ['triton']
 
