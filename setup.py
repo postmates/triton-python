@@ -27,6 +27,7 @@ setup(
     author_email=get_init_val('author_email'),
     url=get_init_val('url'),
     scripts=glob.glob("bin/triton*"),
-    install_requires=['python-snappy', 'msgpack_python', 'pyzmq'],
+    install_requires=['python-snappy', 'msgpack_python', 'pyzmq',
+        'boto', 'pyyaml', 'psycopg2', 'pystatsd'],
     packages=PACKAGES
 )
