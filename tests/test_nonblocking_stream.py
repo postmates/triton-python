@@ -48,16 +48,28 @@ def generate_messy_test_data(primary_key='my_key'):
     }
     return data
 
-def generate_unicode_data(primary_key='my_key'):
+def generate_unicode_data(primary_key=u'my_key'):
     data = {
-        'pkey': primary_key,
-        'value': True,
-        'ascii_key': u'sømé_ünîcode_vàl',
-        u'ünîcødé_key': 'ascii_val'
+        u'pkey': primary_key,
+        u'value': True,
+        u'ascii_key': u'sømé_ünîcode_vàl',
+        u'ünîcødé_key': u'ascii_val',
+        u'ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'
     }
     return data
 
-def generate_transmitted_record(data, stream_name='test_stream'):
+def generate_escaped_unicode_data(primary_key='my_key'):
+    data = {
+        'pkey': primary_key,
+        'value': True,
+        'ascii_key': 'sømé_ünîcode_vàl',
+        'ünîcødé_key': 'ascii_val'
+    }
+    return data
+
+#TODO: generate non-futurized ASCII strings!
+
+def generate_transmitted_record(data, stream_name='test_stream', partition_key='pkey'):
     message_data = msgpack.packb(
         data, default=msgpack_encode_default)
 
@@ -65,7 +77,7 @@ def generate_transmitted_record(data, stream_name='test_stream'):
         nonblocking_stream.META_STRUCT_FMT,
         nonblocking_stream.META_STRUCT_VERSION,
         stream_name,
-        data['pkey'])
+        data[partition_key])
     return meta_data, message_data
 
 
@@ -136,7 +148,7 @@ class NonblockingStreamTest(TestCase):
         assert_equal(mock_sent_meta_data, meta_data)
         assert_equal(mock_sent_message_data, message_data)
 
-    def test_send_unicode_data(self):
+    def test_send_unicode_event(self):
         s = nonblocking_stream.NonblockingStream(u'tést_unicode_stream', u'pkey')
         test_data = generate_unicode_data()
         s.put(**test_data)
@@ -146,7 +158,15 @@ class NonblockingStreamTest(TestCase):
             .zmq_socket.send_multipart.calls[0][0][0])
         assert_equal(mock_sent_meta_data, meta_data)
         assert_equal(mock_sent_message_data, message_data)
-        #TODO: assert equal for data (see function below)
+        #TODO: assert equal for data (see test_send_hard_to_encode_data below)
+
+    def test_unicode_serialize_context(self):
+        s = nonblocking_stream.NonblockingStream(u'tést_üñîçødé_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        test_data = generate_unicode_data()
+        meta_data, message_data = s._serialize_context(test_data)
+        assert_meta_data, assert_message_data = generate_transmitted_record(test_data, stream_name=u'tést_üñîçødé_stream', partition_key=u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        assert_equal(assert_meta_data, meta_data)
+        assert_equal(assert_message_data, message_data)
 
     def test_send_hard_to_encode_data(self):
         s = nonblocking_stream.NonblockingStream('test_stream', 'pkey')
