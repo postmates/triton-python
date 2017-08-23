@@ -74,7 +74,7 @@ class NonblockingStream(object):
             init(*config.get_zmq_config())
 
     def _partition_key(self, data):
-        return unicode(data[self.partition_key])
+        return str(data[self.partition_key])
 
     def _serialize_context(self, data):
         # Our sending format is made up of two messages. The first has a
