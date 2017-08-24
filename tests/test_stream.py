@@ -207,7 +207,7 @@ class StreamTest(TestCase):
 
     def test_partition_key(self):
         c = turtle.Turtle()
-        s = stream.Stream(c, 'test stream', 'value')
+        s = stream.AWSStream('test stream', 'value', conn=c)
 
         assert_equal(s._partition_key({'value': 1}), "1")
 
@@ -225,13 +225,13 @@ class StreamTest(TestCase):
             }
 
         c.describe_stream = describe_stream
-        s = stream.Stream(c, 'test stream', 'value')
+        s = stream.AWSStream('test stream', 'value', conn=c)
 
         assert_equal(set(s.shard_ids), set(['0001', '0002']))
 
     def test_select_shard_ids(self):
         c = turtle.Turtle()
-        s = stream.Stream(c, 'test stream', 'value')
+        s = stream.AWSStream('test stream', 'value', conn=c)
         s._shard_ids = ['0001', '0002', '0003']
 
         shard_ids = s._select_shard_ids([0, 2])
@@ -239,7 +239,7 @@ class StreamTest(TestCase):
 
     def test_select_shard_ids_empty(self):
         c = turtle.Turtle()
-        s = stream.Stream(c, 'test stream', 'value')
+        s = stream.AWSStream('test stream', 'value', conn=c)
         s._shard_ids = ['0001', '0002', '0003']
 
         shard_ids = s._select_shard_ids([])
@@ -247,7 +247,7 @@ class StreamTest(TestCase):
 
     def test_select_shard_ids_missing(self):
         c = turtle.Turtle()
-        s = stream.Stream(c, 'test stream', 'value')
+        s = stream.AWSStream('test stream', 'value', conn=c)
         s._shard_ids = ['0001', '0002', '0003']
 
         with assert_raises(errors.ShardNotFoundError):
@@ -261,7 +261,7 @@ class StreamTest(TestCase):
 
         c.put_record = put_record
 
-        s = stream.Stream(c, 'test stream', 'value')
+        s = stream.AWSStream('test stream', 'value', conn=c)
 
         with mock.patch('pystatsd.increment') as increment:
             shard_id, seq_num = s.put(value=0)
@@ -280,7 +280,7 @@ class StreamTest(TestCase):
 
         c.put_record = put_record
 
-        s = stream.Stream(c, 'test_stream', 'pkey')
+        s = stream.AWSStream('test_stream', 'pkey', conn=c)
 
         test_data = generate_messy_test_data()
         s.put(**test_data)
@@ -306,7 +306,7 @@ class StreamTest(TestCase):
 
         c.put_record = put_record
 
-        s = stream.Stream(c, 'test stream', 'value')
+        s = stream.AWSStream('test stream', 'value', conn=c)
 
         assert_raises(errors.KinesisError, s.put, value=0)
 
@@ -318,7 +318,7 @@ class StreamTest(TestCase):
 
         c.put_records = put_records
 
-        s = stream.Stream(c, 'test stream', 'value')
+        s = stream.AWSStream('test stream', 'value', conn=c)
 
         with mock.patch('pystatsd.increment') as increment:
             resp = s.put_many([dict(value=0)])
@@ -342,7 +342,7 @@ class StreamTest(TestCase):
 
         c.put_records = put_records
 
-        s = stream.Stream(c, 'test stream', 'value')
+        s = stream.AWSStream('test stream', 'value', conn=c)
 
         test_data = generate_messy_test_data()
 
@@ -373,7 +373,7 @@ class StreamTest(TestCase):
 
         c.put_records = put_records
 
-        s = stream.Stream(c, 'test stream', 'value')
+        s = stream.AWSStream('test stream', 'value', conn=c)
 
         for test_count in [1, 499, 500, 501, 1201]:
             resp = s.put_many([dict(value=0)] * test_count)
@@ -382,7 +382,7 @@ class StreamTest(TestCase):
     def test_build_iterator(self):
         c = turtle.Turtle()
 
-        s = stream.Stream(c, 'test stream', 'value')
+        s = stream.AWSStream('test stream', 'value', conn=c)
         shard_ids = ['0001', '0002']
 
         i = s._build_iterator(stream.ITER_TYPE_LATEST, shard_ids, None)
@@ -409,7 +409,7 @@ class StreamTest(TestCase):
 
         c.put_record = put_record
 
-        st = stream.Stream(c, 'test stream', 'value')
+        st = stream.AWSStream('test stream', 'value', conn=c)
 
         shard_id, seq_num = st.put(value=0)
         assert_equal(seq_num, 1)
@@ -452,14 +452,14 @@ class StreamTest(TestCase):
 
         put_records = PutRecords()
         c.put_records = put_records
-        s = stream.Stream(c, 'test stream', 'value')
+        s = stream.AWSStream('test stream', 'value', conn=c)
         test_count = 600
         resp = s.put_many([dict(value=0)] * test_count)
         assert_equal(len(resp), test_count)
 
         put_records = PutRecords(fail_for_n_calls=4, initial_error_rate=1.)
         c.put_records = put_records
-        s = stream.Stream(c, 'test stream', 'value')
+        s = stream.AWSStream('test stream', 'value', conn=c)
         test_count = 100
         assert_raises(
             errors.KinesisPutManyError, s.put_many,
@@ -467,7 +467,7 @@ class StreamTest(TestCase):
 
         put_records = PutRecords(fail_for_n_calls=4, initial_error_rate=.5)
         c.put_records = put_records
-        s = stream.Stream(c, 'test stream', 'value')
+        s = stream.AWSStream('test stream', 'value', conn=c)
         test_count = 100
         try:
             resp = s.put_many([dict(value=0)] * test_count)

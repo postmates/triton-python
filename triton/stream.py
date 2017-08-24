@@ -1,6 +1,8 @@
+import abc
 import base64
 import time
 import logging
+import requests
 
 import msgpack
 import boto.kinesis.layer1
@@ -8,7 +10,10 @@ from boto.kinesis.exceptions import ProvisionedThroughputExceededException
 from boto.exception import BotoServerError
 import boto.regioninfo
 
-from triton import errors
+from google.cloud import pubsub
+from google.oauth2 import service_account
+
+from triton import errors, config
 from triton.checkpoint import TritonCheckpointer
 from triton.encoding import msgpack_encode_default
 
@@ -253,12 +258,83 @@ class CombinedStreamIterator(object):
 
 
 class Stream(object):
+    __metaclass__ = abc.ABCMeta
 
-    def __init__(self, conn, name, partition_key):
-        self.conn = conn
+    @abc.abstractmethod
+    def put(self, **record):
+        pass
+
+    @abc.abstractmethod
+    def put_many(self, records):
+        pass
+
+    def encode(self, record):
+        try:
+            data = msgpack.packb(record)
+        except TypeError:
+            # If we fail to serialize our context, we can try again with an
+            # enhanced packer (it's slower though)
+            data = msgpack.packb(record, default=msgpack_encode_default)
+
+        return data
+
+    def decode(self, record_blob):
+        return msgpack.unpackb(record_blob)
+
+class GCPStream(Stream):
+    # Pubsub limits as defined https://cloud.google.com/pubsub/quotas.
+    BATCH_MAX_BYTES = 10 * 1024 * 1024 # 10 MB
+    BATCH_MAX_MSGS = 1000
+
+    def __init__(self, project, topic, private_key_file):
+        self.http = None
+        self.credentials = None
+
+        # In order to support emulation we either pass
+        # user provided credentials into pubsub.Client or a
+        # simple http client.
+        if private_key_file:
+            self.credentials = service_account.Credentials.from_service_account_file(
+                private_key_file)
+        else:
+            self.http = requests.Session()
+
+        self.client = pubsub.Client(project, credentials=self.credentials, _http=self.http)
+        self.topic = self.client.topic(topic)
+        super(GCPStream, self).__init__()
+
+
+    def put(self, **record):
+        # TODO - Apply a retry policy
+        self.topic.publish(self.encode(record))
+
+
+    def put_many(self, records):
+        packed = [self.encode(record) for record in records]
+        with self.topic.batch(max_messages = self.BATCH_MAX_MSGS) as topic_batch:
+            for pack in packed:
+                topic_batch.publish(pack)
+
+            topic_batch.commit()
+
+
+    def decode(self, pubsub_message):
+        return super(GCPStream, self).decode(pubsub_message.data)
+
+
+class AWSStream(Stream):
+
+    def __init__(self, name, partition_key, conn = None, region='us-east-1'):
+        if conn is not None:
+            self.conn = conn
+        else:
+            self.conn = connect_to_region(region)
+
         self.name = name
         self.partition_key = partition_key
         self._shard_ids = None
+
+        super(AWSStream, self).__init__()
 
     def _partition_key(self, data):
         return unicode(data[self.partition_key])
@@ -295,12 +371,7 @@ class Stream(object):
             STATSD_PUT_ATTEMPT + self.name
         )
 
-        try:
-            data = msgpack.packb(kwargs)
-        except TypeError:
-            # If we fail to serialize our context, we can try again with an
-            # enhanced packer (it's slower though)
-            data = msgpack.packb(kwargs, default=msgpack_encode_default)
+        data = self.encode(kwargs)
         resp = _call_and_retry(
             self.conn.put_record,
             self.name, data,
@@ -317,18 +388,15 @@ class Stream(object):
     def put_many(self, records):
         data_recs = []
         for r in records:
-            try:
-                data = msgpack.packb(r)
-            except TypeError:
-                # If we fail to serialize our context, we can try again with an
-                # enhanced packer (it's slower though)
-                data = msgpack.packb(r, default=msgpack_encode_default)
             data_recs.append({
-                'Data': data,
+                'Data': self.encode(r),
                 'PartitionKey': self._partition_key(r),
             })
 
         return self._put_many_packed(data_recs)
+
+    def decode(self, record_blob):
+        return super(AWSStream, self).decode(base64.b64decode(record_blob))
 
     def _put_many_packed(self, records, retry_count=0, b64_encode=True):
         """Re-usable method for already packed messages,
@@ -434,9 +502,12 @@ def get_stream(stream_name, config):
     if not s_config:
         raise errors.StreamNotConfiguredError()
 
-    conn = connect_to_region(s_config.get('region', 'us-east-1'))
+    provider = s_config['provider']
 
-    return Stream(conn, s_config['name'], s_config['partition_key'])
+    if provider == config.PROVIDER_AWS:
+        return AWSStream(**s_config)
+    else:
+        return GCPStream(**s_config)
 
 
 def _call_and_retry(kinesis_function, *args, **kwargs):
