@@ -39,11 +39,9 @@ my_pubsub_stream:
   private_key_file: /path/to/service/account/private.key
 ```
 
-Note - It is assumed that the given service account private key provides the proper permissions to the topic - read access for consumption
-and/or write access for publication.
+Note - It is assumed that the given service account private key provides the proper permissions to the topic - read access for consumption and/or write access for publication.
 
-Given Pubsub's simplified interface, clients are not able to control which storage nodes in the data plane a given message is published to.
-As is the case with Kinesis streams.
+Given Pubsub's simplified interface, clients are not able to control which storage nodes in the data plane a given message is published to.  As is the case with Kinesis streams.
 
 ### Demo
 
