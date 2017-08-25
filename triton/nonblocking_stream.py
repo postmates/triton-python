@@ -11,7 +11,6 @@ Adapted from https://github.com/rhettg/BlueOx/blob/master/blueox/network.py
 
 """
 from __future__ import unicode_literals
-from builtins import str
 import logging
 import threading
 import struct
