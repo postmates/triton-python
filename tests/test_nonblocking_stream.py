@@ -69,6 +69,11 @@ def generate_escaped_unicode_data(primary_key='my_key'):
 
 #TODO: generate non-futurized ASCII strings!
 
+#NOTE: stream name is guaranteed to be a string, therefore we can safely do
+#.encode('utf-8') to convert to ascii so struct can handle it. But
+#data[partition_key] could return either a unicode string or another non-string
+#value. Therefore, we have to safely convert to a unicode string before encoding,
+#just as NonblockingStream._partition_key does.
 def generate_transmitted_record(data, stream_name='test_stream', partition_key='pkey'):
     message_data = msgpack.packb(
         data, default=msgpack_encode_default)
@@ -77,7 +82,7 @@ def generate_transmitted_record(data, stream_name='test_stream', partition_key='
         nonblocking_stream.META_STRUCT_FMT,
         nonblocking_stream.META_STRUCT_VERSION,
         stream_name.encode('utf-8'),
-        data[partition_key].encode('utf-8'))
+        unicode(data[partition_key]).encode('utf-8'))
     return meta_data, message_data
 
 
@@ -149,10 +154,10 @@ class NonblockingStreamTest(TestCase):
         assert_equal(mock_sent_message_data, message_data)
 
     def test_send_unicode_event(self):
-        s = nonblocking_stream.NonblockingStream(u'tést_unicode_stream', u'pkey')
+        s = nonblocking_stream.NonblockingStream(u'tést_üñîçødé_stream_宇宙', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
         test_data = generate_unicode_data()
         s.put(**test_data)
-        meta_data, message_data = generate_transmitted_record(test_data, stream_name=u'tést_unicode_stream')
+        meta_data, message_data = generate_transmitted_record(test_data, stream_name=u'tést_üñîçødé_stream_宇宙')
         mock_sent_meta_data, mock_sent_message_data = (
             nonblocking_stream.threadLocal
             .zmq_socket.send_multipart.calls[0][0][0])
