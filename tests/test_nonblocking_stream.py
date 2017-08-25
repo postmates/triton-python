@@ -157,7 +157,7 @@ class NonblockingStreamTest(TestCase):
         s = nonblocking_stream.NonblockingStream(u'tést_üñîçødé_stream_宇宙', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
         test_data = generate_unicode_data()
         s.put(**test_data)
-        meta_data, message_data = generate_transmitted_record(test_data, stream_name=u'tést_üñîçødé_stream_宇宙')
+        meta_data, message_data = generate_transmitted_record(test_data, stream_name=u'tést_üñîçødé_stream_宇宙', partition_key=u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
         mock_sent_meta_data, mock_sent_message_data = (
             nonblocking_stream.threadLocal
             .zmq_socket.send_multipart.calls[0][0][0])
