@@ -17,7 +17,7 @@ import tempfile
 from collections import defaultdict
 
 from triton import nonblocking_stream, config
-from triton.encoding import msgpack_encode_default
+from triton.encoding import msgpack_encode_default, unicode_to_ascii_str, ascii_to_unicode_str
 
 TEST_LOGS_BASE_DIRECTORY_SLUG = 'test_logs'
 TEST_TRITON_ZMQ_PORT = 3517  # in case tritond is running
@@ -82,8 +82,8 @@ def generate_transmitted_record(data, stream_name='test_stream', partition_key='
     meta_data = struct.pack(
         nonblocking_stream.META_STRUCT_FMT,
         nonblocking_stream.META_STRUCT_VERSION,
-        stream_name.encode('utf-8'),
-        unicode(data[partition_key]).encode('utf-8'))
+        unicode_to_ascii_str(stream_name),
+        unicode_to_ascii_str(data[partition_key]))
     return meta_data, message_data
 
 
@@ -167,10 +167,10 @@ class NonblockingStreamTest(TestCase):
         #TODO: assert equal for data (see test_send_hard_to_encode_data below)
 
     def test_send_escaped_unicode_event(self):
-        s = nonblocking_stream.NonblockingStream('tést_üñîçødé_stream_宇宙', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        s = nonblocking_stream.NonblockingStream('tést_éßçåπéd_üñîçødé_stream_宇宙', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
         test_data = generate_escaped_unicode_data()
         s.put(**test_data)
-        meta_data, message_data = generate_transmitted_record(test_data, stream_name='tést_üñîçødé_stream_宇宙', partition_key='ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        meta_data, message_data = generate_transmitted_record(test_data, stream_name='tést_éßçåπéd_üñîçødé_stream_宇宙', partition_key='ünîcødé_πå®tîtîøñ_ke¥_宇宙')
         mock_sent_meta_data, mock_sent_message_data = (
             nonblocking_stream.threadLocal
             .zmq_socket.send_multipart.calls[0][0][0])
@@ -187,10 +187,10 @@ class NonblockingStreamTest(TestCase):
         assert_equal(assert_message_data, message_data)
 
     def test_escaped_unicode_serialize_context(self):
-        s = nonblocking_stream.NonblockingStream('tést_üñîçødé_stream', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        s = nonblocking_stream.NonblockingStream('tést_éßçåπéd_üñîçødé_stream_宇宙', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
         test_data = generate_escaped_unicode_data()
         meta_data, message_data = s._serialize_context(test_data)
-        assert_meta_data, assert_message_data = generate_transmitted_record(test_data, stream_name='tést_üñîçødé_stream', partition_key='ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        assert_meta_data, assert_message_data = generate_transmitted_record(test_data, stream_name='tést_éßçåπéd_üñîçødé_stream_宇宙', partition_key='ünîcødé_πå®tîtîøñ_ke¥_宇宙')
         assert_equal(assert_meta_data, meta_data)
         assert_equal(assert_message_data, message_data)
 
