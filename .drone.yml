@@ -32,4 +32,4 @@ pipeline:
       - DISABLE_GRPC=1
       - PUBSUB_EMULATOR_HOST=gcloud:8085
     commands:
-      - testify tests
+      - testify tests/test_composite.py

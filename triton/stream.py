@@ -260,13 +260,16 @@ class CombinedStreamIterator(object):
 class Stream(object):
     __metaclass__ = abc.ABCMeta
 
+
     @abc.abstractmethod
     def put(self, **record):
         pass
 
+
     @abc.abstractmethod
     def put_many(self, records):
         pass
+
 
     def encode(self, record):
         try:
@@ -278,13 +281,31 @@ class Stream(object):
 
         return data
 
+
     def decode(self, record_blob):
         return msgpack.unpackb(record_blob)
+
+
+class CompositeStream(Stream):
+
+
+    def __init__(self, streams):
+        self.streams = streams
+
+
+    def put(self, **record):
+        return [stream.put(**record) for stream in self.streams]
+
+
+    def put_many(self, records):
+        return [stream.put_many(records) for stream in self.streams]
+
 
 class GCPStream(Stream):
     # Pubsub limits as defined https://cloud.google.com/pubsub/quotas.
     BATCH_MAX_BYTES = 10 * 1024 * 1024 # 10 MB
     BATCH_MAX_MSGS = 1000
+
 
     def __init__(self, project, topic, private_key_file):
         self.http = None
@@ -304,19 +325,43 @@ class GCPStream(Stream):
         super(GCPStream, self).__init__()
 
 
+    @staticmethod
+    def retry_policy(e):
+        return True
+
+
     def put(self, **record):
         # TODO - Apply a retry policy
-        self.topic.publish(self.encode(record))
+        msg_id = _call_and_retry(
+            self.topic.publish,
+            self.encode(record),
+            retry_on_exception=self.retry_policy)
+
+        return (None, msg_id)
 
 
     def put_many(self, records):
+        message_ids = []
         packed = [self.encode(record) for record in records]
+
         with self.topic.batch(max_messages = self.BATCH_MAX_MSGS) as topic_batch:
             for pack in packed:
-                topic_batch.publish(pack)
+                _call_and_retry(
+                    topic_batch.publish,
+                    pack,
+                    retry_on_exception=self.retry_policy
+                )
 
-            topic_batch.commit()
+            _call_and_retry(
+                topic_batch.commit,
+                retry_on_exception = self.retry_policy
+            )
 
+            # topic.batch defines an iterator
+            # over message_ids.
+            message_ids = list(topic_batch)
+
+        return [(None, message_ids)]
 
     def decode(self, pubsub_message):
         return super(GCPStream, self).decode(pubsub_message.data)
@@ -366,6 +411,10 @@ class AWSStream(Stream):
 
         return shard_ids
 
+    @staticmethod
+    def retry_policy(e):
+        return isinstance(e, BotoServerError) and ((e.status / 100 == 5) or type(e) == ProvisionedThroughputExceededException)
+
     def put(self, **kwargs):
         pystatsd.increment(
             STATSD_PUT_ATTEMPT + self.name
@@ -375,7 +424,8 @@ class AWSStream(Stream):
         resp = _call_and_retry(
             self.conn.put_record,
             self.name, data,
-            self._partition_key(kwargs)
+            self._partition_key(kwargs),
+            retry_on_exception = self.retry_policy
         )
 
         try:
@@ -434,6 +484,7 @@ class AWSStream(Stream):
                 self.conn.put_records,
                 records[max_record:max_record + KINESIS_MAX_LENGTH],
                 self.name,
+                retry_on_exception=self.retry_policy,
                 b64_encode=b64_encode)
 
             for idx, r in enumerate(resp['Records']):
@@ -502,34 +553,40 @@ def get_stream(stream_name, config):
     if not s_config:
         raise errors.StreamNotConfiguredError()
 
-    provider = s_config['provider']
+    if isinstance(s_config, list):
+        streams = [get_stream_by_provider(stream_name, entry) for entry in s_config]
+        return CompositeStream(streams)
+    else:
+        return get_stream_by_provider(stream_name, s_config)
+
+
+def get_stream_by_provider(stream_name, stream_config):
+    provider = stream_config.pop('provider', config.PROVIDER_AWS)
 
     if provider == config.PROVIDER_AWS:
-        return AWSStream(**s_config)
+        return AWSStream(**stream_config)
     else:
-        return GCPStream(**s_config)
+        return GCPStream(**stream_config)
 
 
-def _call_and_retry(kinesis_function, *args, **kwargs):
+def _call_and_retry(function, *args, **kwargs):
     """
     Retry Logic for generic kinesis calls.
 
     This code follows the exponetial backoff pattern suggested by
     http://docs.aws.amazon.com/general/latest/gr/api-retries.html
     """
+    retry_on_exception = kwargs.pop('retry_on_exception', None)
     retries = 0
     while True:
         try:
-            return kinesis_function(*args, **kwargs)
-        except BotoServerError as e:
+            return function(*args, **kwargs)
+        except Exception as e:
             if retries >= KINESIS_MAX_RETRYS:
-                raise e
-            if (
-                    e.status / 100 == 5  # 5xx error
-                    or
-                    type(e) == ProvisionedThroughputExceededException
-            ):
-                time.sleep(2 ** retries * .1)
-                retries += 1
-            else:
-                raise e
+                raise
+
+            if retry_on_exception is not None and not retry_on_exception(e):
+                raise
+
+            time.sleep(2 ** retries * .1)
+            retries += 1

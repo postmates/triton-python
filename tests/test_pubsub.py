@@ -1,6 +1,8 @@
 import os
 
 import requests
+import triton
+import pubsub_util
 
 from testify import *
 from google.cloud import pubsub
@@ -33,11 +35,16 @@ class GCPTest(TestCase):
 
 
     def get_stream(self):
-        return stream.GCPStream(
-            project = self.project,
-            topic = self.topic_name,
-            private_key_file = None
-        )
+        pubsub_config = dict(
+            provider='gcp',
+            project=self.project,
+            topic=self.topic_name,
+            private_key_file=None)
+
+        config = dict(
+            test_stream = pubsub_config)
+
+        return triton.get_stream('test_stream', config)
 
 
     def fetch_all(self):
@@ -49,7 +56,7 @@ class GCPTest(TestCase):
                 break
 
             results = results + [message for ack_id, message in batch]
-            self.sub.acknowledge([ack_id for ack_id, message in batch])     
+            self.sub.acknowledge([ack_id for ack_id, message in batch])
 
         return results
 
@@ -67,11 +74,7 @@ class GCPTest(TestCase):
         )
         stream.put(**record)
 
-        messages = self.fetch_all()
-        assert_equal(len(messages), 1)
-        for message in messages:
-            unpacked = stream.decode(message)
-            assert_equal(record, unpacked)
+        pubsub_util.assert_stream_equals(self.sub, [record], decoder=stream.decode)
 
 
     def test_publish_batch(self):
@@ -86,17 +89,8 @@ class GCPTest(TestCase):
             batch.append(record)
 
         stream.put_many(batch)
+        pubsub_util.assert_stream_equals(self.sub, batch, decoder=stream.decode)
 
-        pubsub_messages = self.fetch_all()
-        assert_truthy(len(pubsub_messages) >= len(batch))
-
-        # Pubsub is at least once publishing, so we do some work to dedup a list of dicts.
-        message_dicts = [stream.decode(pubsub_message) for pubsub_message in pubsub_messages]
-        messages = [dict(tup) for tup in set([tuple(message_dict.items()) for message_dict in message_dicts])]
-        assert_equal(len(batch), len(messages))
-
-        for message in messages:
-            assert_truthy(message in batch)
 
     def test_publish_batch_larger_than_limits(self):
         stream = self.get_stream()
@@ -110,14 +104,18 @@ class GCPTest(TestCase):
             batch.append(record)
 
         stream.put_many(batch)
+        pubsub_util.assert_stream_equals(self.sub, batch, decoder=stream.decode)
 
-        pubsub_messages = self.fetch_all()
-        assert_truthy(len(pubsub_messages) >= len(batch))
+    def test_publish_batch_has_too_many_bytes(self):
+        stream = self.get_stream()
 
-        # Pubsub is at least once publishing, so we do some work to dedup a list of dicts.
-        message_dicts = [stream.decode(pubsub_message) for pubsub_message in pubsub_messages]
-        messages = [dict(tup) for tup in set([tuple(message_dict.items()) for message_dict in message_dicts])]
-        assert_equal(len(batch), len(messages))
+        batch = []
+        for i in range(0, 2 * BATCH_MAX_MSGS + 10):
+            record = dict(
+                blob = 'foobar',
+                timestamp = i
+            )
+            batch.append(record)
 
-        for message in messages:
-            assert_truthy(message in batch)
+        stream.put_many(batch)
+        pubsub_util.assert_stream_equals(self.sub, batch, decoder=stream.decode)

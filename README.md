@@ -43,6 +43,25 @@ Note - It is assumed that the given service account private key provides the pro
 
 Given Pubsub's simplified interface, clients are not able to control which storage nodes in the data plane a given message is published to.  As is the case with Kinesis streams.
 
+#### Multiplexing
+
+Streams can also be configured to represent multiple downstream providers.  For example, the stream alias `my_composite_stream` can be configured to publish events to both Kinesis and Pubsub as follows:
+
+```yaml
+my_composite_stream:
+  -
+    provider: aws
+    name: my_kinesis_stream
+    partition_key: value
+    region: us-west-1
+
+  -
+    provider: gcp
+    project: my_project
+    topic: my_topic
+    private_key_file: /path/to/service/account/private.key
+```
+
 ### Demo
 
 Triton comes with a command line script `triton` which can be used to demo some simple functionality.
@@ -69,7 +88,6 @@ Adding records to the stream is easy:
 
     s = triton.get_stream('my_stream', c)
     s.put(value='hi mom', ts=time.time())
-
 
 For more advanced uses, you can record the shard and sequence number returned
 by the put operation.
