@@ -157,7 +157,23 @@ class NonblockingStreamTest(TestCase):
             .zmq_socket.send_multipart.calls[0][0][0])
         assert_equal(mock_sent_meta_data, meta_data)
         assert_equal(mock_sent_message_data, message_data)
-        #TODO: assert equal for data (see test_send_hard_to_encode_data below)
+        sent_data = msgpack.unpackb(mock_sent_message_data, encoding='utf-8')
+        #NOTE: ascii key does correct lookup for 1-byte unicode key
+        assert_equal(
+            sent_data['ascii_key'],
+            test_data['ascii_key']
+        )
+        assert_equal(
+            sent_data[u'ascii_key'],
+            test_data[u'ascii_key']
+        )
+        #NOTE: for multi-byte unicode keys, "escaped" ascii bytestrings will KeyError.
+        #you need to give unicode objects as keys
+        assert_equal(
+            sent_data[u'ünîcødé_πå®tîtîøñ_ke¥_宇宙'],
+            test_data[u'ünîcødé_πå®tîtîøñ_ke¥_宇宙']
+        )
+        assert_falsey('ünîcødé_πå®tîtîøñ_ke¥_宇宙' in sent_data)
 
     def test_send_escaped_unicode_event(self):
         s = nonblocking_stream.NonblockingStream('tést_éßçåπéd_üñîçødé_stream_宇宙', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
@@ -169,7 +185,25 @@ class NonblockingStreamTest(TestCase):
             .zmq_socket.send_multipart.calls[0][0][0])
         assert_equal(mock_sent_meta_data, meta_data)
         assert_equal(mock_sent_message_data, message_data)
-        #TODO: assert equal for data (see test_send_hard_to_encode_data below)
+        #NOTE: NOT unpacking with encoding='utf-8' to test escaped ascii data
+        sent_data = msgpack.unpackb(mock_sent_message_data)
+        #NOTE: both ascii and single-byte unicode keys correctly look up
+        #ascii keys
+        assert_equal(
+            sent_data['ascii_key'],
+            test_data['ascii_key']
+        )
+        assert_equal(
+            sent_data[u'ascii_key'],
+            test_data[u'ascii_key']
+        )
+        assert_equal(
+            sent_data['ünîcødé_πå®tîtîøñ_ke¥_宇宙'],
+            test_data['ünîcødé_πå®tîtîøñ_ke¥_宇宙']
+        )
+        #NOTE: for multi-byte unicode keys, unicode will KeyError when trying
+        #to look up "escaped" ascii
+        assert_falsey(u'ünîcødé_πå®tîtîøñ_ke¥_宇宙' in sent_data)
 
     def test_unicode_serialize_context(self):
         s = nonblocking_stream.NonblockingStream(u'tést_üñîçødé_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
