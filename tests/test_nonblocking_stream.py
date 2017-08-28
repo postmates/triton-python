@@ -278,6 +278,24 @@ class NonblockingStreamEndToEnd(TestCase):
             if stream_name in received_data:
                 assert_equal(len(received_data[stream_name]), 10)
 
+    def test_escaped_unicode_end_to_end(self):
+        stream_name = 'téßt_üñîçø∂é_st®éåµ_宇宙'
+        test_stream = nonblocking_stream.NonblockingStream(
+            stream_name, 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        for i in range(10):
+            test_stream.put(**generate_escaped_unicode_data())
+        time.sleep(1)
+        assert_truthy(os.path.exists(self.log_file))
+        if os.path.exists(self.log_file):
+            with open(self.log_file, u'rb') as output_file:
+                received_data = decode_debug_data(output_file)
+            #NOTE: "escaped" unicode comes out the read-side of the stream as
+            #pure unicode, so we need to convert the stream name to unicode for
+            #assert
+            assert_truthy(ascii_to_unicode_str(stream_name) in received_data)
+            if stream_name in received_data:
+                assert_equal(len(received_data[stream_name]), 10)
+
     def test_multiple_streams(self):
         streams = set(['stream_a', 'stream_b'])
         for stream_name in streams:
