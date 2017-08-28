@@ -35,4 +35,6 @@ def ascii_to_unicode_str(text):
     if isinstance(text, str):
         return text.decode('utf-8')
     else:
+        #need to unicode here because this function could be fed something
+        #that's not an ascii str but needs to be a unicode string (e.g. an int)
         return unicode(text)
