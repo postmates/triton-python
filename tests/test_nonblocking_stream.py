@@ -68,13 +68,6 @@ def generate_escaped_unicode_data(primary_key='my_key'):
     }
     return data
 
-#TODO: generate non-futurized ASCII strings!
-
-#NOTE: stream name is guaranteed to be a string, therefore we can safely do
-#.encode('utf-8') to convert to ascii so struct can handle it. But
-#data[partition_key] could return either a unicode string or another non-string
-#value. Therefore, we have to safely convert to a unicode string before encoding,
-#just as NonblockingStream._partition_key does.
 def generate_transmitted_record(data, stream_name='test_stream', partition_key='pkey'):
     message_data = msgpack.packb(
         data, default=msgpack_encode_default)
