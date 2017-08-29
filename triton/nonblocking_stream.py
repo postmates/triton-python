@@ -10,6 +10,7 @@ It does this by sending the messageover ZeroMQ to tritond.
 Adapted from https://github.com/rhettg/BlueOx/blob/master/blueox/network.py
 
 """
+from __future__ import unicode_literals
 import logging
 import threading
 import struct
@@ -20,7 +21,7 @@ import msgpack
 
 from triton import errors
 from triton import config
-from triton.encoding import msgpack_encode_default
+from triton.encoding import msgpack_encode_default, unicode_to_ascii_str, ascii_to_unicode_str
 
 log = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class NonblockingStream(object):
             init(*config.get_zmq_config())
 
     def _partition_key(self, data):
-        return str(data[self.partition_key])
+        return ascii_to_unicode_str(data[self.partition_key])
 
     def _serialize_context(self, data):
         # Our sending format is made up of two messages. The first has a
@@ -84,8 +85,8 @@ class NonblockingStream(object):
             raise ValueError("Partition Key Too Long")
 
         meta_data = struct.pack(META_STRUCT_FMT, META_STRUCT_VERSION,
-                                self.name,
-                                self._partition_key(data))
+                                unicode_to_ascii_str(self.name),
+                                unicode_to_ascii_str(self._partition_key(data)))
         try:
             message_data = msgpack.packb(data)
         except TypeError:

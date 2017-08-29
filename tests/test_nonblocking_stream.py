@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from testify import *
 import mock
 
@@ -15,7 +17,7 @@ import tempfile
 from collections import defaultdict
 
 from triton import nonblocking_stream, config
-from triton.encoding import msgpack_encode_default
+from triton.encoding import msgpack_encode_default, unicode_to_ascii_str, ascii_to_unicode_str
 
 TEST_LOGS_BASE_DIRECTORY_SLUG = 'test_logs'
 TEST_TRITON_ZMQ_PORT = 3517  # in case tritond is running
@@ -46,16 +48,35 @@ def generate_messy_test_data(primary_key='my_key'):
     }
     return data
 
+def generate_unicode_data(primary_key=u'my_key'):
+    data = {
+        u'pkey': primary_key,
+        u'value': True,
+        u'ascii_key': u'sømé_ünîcode_vàl',
+        u'ünîcødé_key': u'ascii_val',
+        u'ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'
+    }
+    return data
 
-def generate_transmitted_record(data, stream_name='test_stream'):
+def generate_escaped_unicode_data(primary_key='my_key'):
+    data = {
+        'pkey': primary_key,
+        'value': True,
+        'ascii_key': 'sømé_ünîcode_vàl',
+        'ünîcødé_key': 'ascii_val',
+        'ünîcødé_πå®tîtîøñ_ke¥_宇宙': 'ünîcødé_πå®tîtîøñ_√al_宇宙'
+    }
+    return data
+
+def generate_transmitted_record(data, stream_name='test_stream', partition_key='pkey'):
     message_data = msgpack.packb(
         data, default=msgpack_encode_default)
 
     meta_data = struct.pack(
         nonblocking_stream.META_STRUCT_FMT,
         nonblocking_stream.META_STRUCT_VERSION,
-        stream_name,
-        data['pkey'])
+        unicode_to_ascii_str(stream_name),
+        unicode_to_ascii_str(data[partition_key]))
     return meta_data, message_data
 
 
@@ -92,11 +113,11 @@ def _serialize_context(self, data):
 
 
 def decode_debug_data(file_object):
-    unpacker = msgpack.Unpacker(file_object)
+    unpacker = msgpack.Unpacker(file_object, encoding='utf-8')
     data = defaultdict(list)
     current_list = None
     for item in unpacker:
-        if type(item) == str:
+        if type(item) == unicode:
             current_list = data[item]
         else:
             current_list.append(item)
@@ -126,6 +147,80 @@ class NonblockingStreamTest(TestCase):
         assert_equal(mock_sent_meta_data, meta_data)
         assert_equal(mock_sent_message_data, message_data)
 
+    def test_send_unicode_event(self):
+        s = nonblocking_stream.NonblockingStream(u'tést_üñîçødé_stream_宇宙', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        test_data = generate_unicode_data()
+        s.put(**test_data)
+        meta_data, message_data = generate_transmitted_record(test_data, stream_name=u'tést_üñîçødé_stream_宇宙', partition_key=u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        mock_sent_meta_data, mock_sent_message_data = (
+            nonblocking_stream.threadLocal
+            .zmq_socket.send_multipart.calls[0][0][0])
+        assert_equal(mock_sent_meta_data, meta_data)
+        assert_equal(mock_sent_message_data, message_data)
+        sent_data = msgpack.unpackb(mock_sent_message_data, encoding='utf-8')
+        #NOTE: ascii key does correct lookup for 1-byte unicode key
+        assert_equal(
+            sent_data['ascii_key'],
+            test_data['ascii_key']
+        )
+        assert_equal(
+            sent_data[u'ascii_key'],
+            test_data[u'ascii_key']
+        )
+        #NOTE: for multi-byte unicode keys, "escaped" ascii bytestrings will KeyError.
+        #you need to give unicode objects as keys
+        assert_equal(
+            sent_data[u'ünîcødé_πå®tîtîøñ_ke¥_宇宙'],
+            test_data[u'ünîcødé_πå®tîtîøñ_ke¥_宇宙']
+        )
+        assert_falsey('ünîcødé_πå®tîtîøñ_ke¥_宇宙' in sent_data)
+
+    def test_send_escaped_unicode_event(self):
+        s = nonblocking_stream.NonblockingStream('tést_éßçåπéd_üñîçødé_stream_宇宙', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        test_data = generate_escaped_unicode_data()
+        s.put(**test_data)
+        meta_data, message_data = generate_transmitted_record(test_data, stream_name='tést_éßçåπéd_üñîçødé_stream_宇宙', partition_key='ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        mock_sent_meta_data, mock_sent_message_data = (
+            nonblocking_stream.threadLocal
+            .zmq_socket.send_multipart.calls[0][0][0])
+        assert_equal(mock_sent_meta_data, meta_data)
+        assert_equal(mock_sent_message_data, message_data)
+        #NOTE: NOT unpacking with encoding='utf-8' to test escaped ascii data
+        sent_data = msgpack.unpackb(mock_sent_message_data)
+        #NOTE: both ascii and single-byte unicode keys correctly look up
+        #ascii keys
+        assert_equal(
+            sent_data['ascii_key'],
+            test_data['ascii_key']
+        )
+        assert_equal(
+            sent_data[u'ascii_key'],
+            test_data[u'ascii_key']
+        )
+        assert_equal(
+            sent_data['ünîcødé_πå®tîtîøñ_ke¥_宇宙'],
+            test_data['ünîcødé_πå®tîtîøñ_ke¥_宇宙']
+        )
+        #NOTE: for multi-byte unicode keys, unicode will KeyError when trying
+        #to look up "escaped" ascii
+        assert_falsey(u'ünîcødé_πå®tîtîøñ_ke¥_宇宙' in sent_data)
+
+    def test_unicode_serialize_context(self):
+        s = nonblocking_stream.NonblockingStream(u'tést_üñîçødé_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        test_data = generate_unicode_data()
+        meta_data, message_data = s._serialize_context(test_data)
+        assert_meta_data, assert_message_data = generate_transmitted_record(test_data, stream_name=u'tést_üñîçødé_stream', partition_key=u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        assert_equal(assert_meta_data, meta_data)
+        assert_equal(assert_message_data, message_data)
+
+    def test_escaped_unicode_serialize_context(self):
+        s = nonblocking_stream.NonblockingStream('tést_éßçåπéd_üñîçødé_stream_宇宙', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        test_data = generate_escaped_unicode_data()
+        meta_data, message_data = s._serialize_context(test_data)
+        assert_meta_data, assert_message_data = generate_transmitted_record(test_data, stream_name='tést_éßçåπéd_üñîçødé_stream_宇宙', partition_key='ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        assert_equal(assert_meta_data, meta_data)
+        assert_equal(assert_message_data, message_data)
+
     def test_send_hard_to_encode_data(self):
         s = nonblocking_stream.NonblockingStream('test_stream', 'pkey')
         test_data = generate_messy_test_data()
@@ -136,7 +231,7 @@ class NonblockingStreamTest(TestCase):
             .zmq_socket.send_multipart.calls[0][0][0])
         assert_equal(mock_sent_meta_data, meta_data)
         assert_equal(mock_sent_message_data, message_data)
-        sent_data = msgpack.unpackb(mock_sent_message_data)
+        sent_data = msgpack.unpackb(mock_sent_message_data, encoding='utf-8')
         assert_equal(
             sent_data['time'],
             test_data['time'].isoformat(' '))
@@ -190,8 +285,41 @@ class NonblockingStreamEndToEnd(TestCase):
         assert_truthy(os.path.exists(self.log_file))
         if os.path.exists(self.log_file):
             with open(self.log_file, 'rb') as output_file:
-                received_data = (decode_debug_data(output_file))
+                received_data = decode_debug_data(output_file)
             assert_truthy(stream_name in received_data)
+            if stream_name in received_data:
+                assert_equal(len(received_data[stream_name]), 10)
+
+    def test_unicode_end_to_end(self):
+        stream_name = u'téßt_üñîçø∂é_st®éåµ_宇宙'
+        test_stream = nonblocking_stream.NonblockingStream(
+            stream_name, u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        for i in range(10):
+            test_stream.put(**generate_unicode_data())
+        time.sleep(1)
+        assert_truthy(os.path.exists(self.log_file))
+        if os.path.exists(self.log_file):
+            with open(self.log_file, u'rb') as output_file:
+                received_data = decode_debug_data(output_file)
+            assert_truthy(stream_name in received_data)
+            if stream_name in received_data:
+                assert_equal(len(received_data[stream_name]), 10)
+
+    def test_escaped_unicode_end_to_end(self):
+        stream_name = 'téßt_üñîçø∂é_st®éåµ_宇宙'
+        test_stream = nonblocking_stream.NonblockingStream(
+            stream_name, 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        for i in range(10):
+            test_stream.put(**generate_escaped_unicode_data())
+        time.sleep(1)
+        assert_truthy(os.path.exists(self.log_file))
+        if os.path.exists(self.log_file):
+            with open(self.log_file, u'rb') as output_file:
+                received_data = decode_debug_data(output_file)
+            #NOTE: "escaped" unicode comes out the read-side of the stream as
+            #pure unicode, so we need to convert the stream name to unicode for
+            #assert
+            assert_truthy(ascii_to_unicode_str(stream_name) in received_data)
             if stream_name in received_data:
                 assert_equal(len(received_data[stream_name]), 10)
 
