@@ -206,7 +206,7 @@ The DB also needs to have a specific table created; calling the following will i
 
 Triton checkpointing also requires a unique client name, since the basic
 assumption is that the checkpoint DB will be shared. The client name is specified
-by the ENV variable `TRITON_CLIENT_NAME`. 
+by the ENV variable `TRITON_CLIENT_NAME`.
 Attempting to checkpoint without this ENV variable will also raise a
 `TritonCheckpointError` exception.
 
@@ -247,7 +247,47 @@ Or using the API, something like:
 
 #### Pubsub
 
- TODO
+The following example sets up a Pubsub consumer which pulls messages from the horizon of the configured topic until Google closes connection due to inactivity:
+
+```python
+import triton
+
+config = triton.load_config("/etc/triton.yaml")
+stream = triton.get_stream("my_gcp_stream", config)
+
+for message in s:
+   print message
+```
+
+Note - Messages are acknowledged as new messages are returned from the iterator.  Furthermore, a subscription named as `triton-uuid.uuid4.hex` is created on behalf of the user.
+
+The above example can also be expressed as follows in order to handle cases where publishers may not publish events for a sufficiently long period of time:
+
+```
+import triton
+
+config = triton.load_config("/etc/triton.yaml")
+stream = triton.get_stream("my_gcp_stream", config)
+iterator = triton.get_iterator_from_latest()
+
+for message in iterator:
+   print message
+```
+
+Pubsub consumers can also resume from a named subscription:
+
+```python
+import triton
+
+subscription_id = 'my-subscription'
+config = triton.load_config("/etc/triton.yaml")
+stream = triton.get_stream("my_gcp_stream", config)
+
+for message in s.build_iterator_from_checkpoint(subscription_id):
+   print message
+```
+
+Note - The user must create the subscription prior to consumption otherwise an exception will be raised.
 
 ## Development
 
