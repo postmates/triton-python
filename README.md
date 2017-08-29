@@ -45,7 +45,7 @@ Given Pubsub's simplified interface, clients are not able to control which stora
 
 #### Multiplexing
 
-Streams can also be configured to represent multiple downstream providers.  For example, the stream alias `my_composite_stream` can be configured to publish events to both Kinesis and Pubsub as follows:
+Streams can also be configured to represent multiple downstream providers.  For example, the stream alias `my_composite_stream` can be configured to interact with both Kinesis and Pubsub as follows:
 
 ```yaml
 my_composite_stream:
@@ -259,7 +259,7 @@ for message in s:
    print message
 ```
 
-Note - Messages are acknowledged as new messages are returned from the iterator.  Furthermore, a subscription named as `triton-uuid.uuid4.hex` is created on behalf of the user.
+Note - Messages are acknowledged as new messages are returned from the iterator.  Furthermore, a subscription prefixed with `triton-` is created on behalf of the user.
 
 The above example can also be expressed as follows in order to handle cases where publishers may not publish events for a sufficiently long period of time:
 

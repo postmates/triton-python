@@ -1,6 +1,6 @@
 # vim: set ts=2 sts=2 sw=2 et:
 
-test_image_versioned: &test_image_versioned triton:${DRONE_BRANCH}-${DRONE_BUILD_NUMBER}-${DRONE_COMMIT_SHA:0:8}
+test_image_versioned: &test_image_versioned triton:${DRONE_BUILD_NUMBER}-${DRONE_COMMIT_SHA:0:8}
 
 workspace:
   base: /triton
@@ -19,7 +19,7 @@ pipeline:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     commands:
-      docker build -t triton:${DRONE_BRANCH}-${DRONE_BUILD_NUMBER}-${DRONE_COMMIT_SHA:0:8} -f Dockerfile.dev .
+      docker build -t triton:${DRONE_BUILD_NUMBER}-${DRONE_COMMIT_SHA:0:8} -f Dockerfile.dev .
 
   test-gcloud:
     image: alpine:3.5
