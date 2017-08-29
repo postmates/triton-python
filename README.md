@@ -291,17 +291,49 @@ Note - The user must create the subscription prior to consumption otherwise an e
 
 ## Development
 
+### Drone
+
+Every pull request triggers automated unit and integration testing via drone.
+
+The following illustrates how to run the drone pipeline locally:
+
+#### Requirements
+
+* Minikube
+* Docker (installed and configured to use minikube)
+
+  ```
+  eval $(minikube docker-env)
+  ```
+
+* Drone >= 0.7.3
+
+#### Execute the Pipeline
+
+```
+make test-drone
+```
+
+### Ubuntu
+
 You should be able to configure your development environment using make:
 
     ~/python-triton $ make dev
 
 You will likely need to install system libraries as well:
 
-    ~/python-triton $ sudo apt-get install libsnappy-dev libzmq-dev
+    ~/python-triton $ export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)"
+    ~/python-triton $ echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+    ~/python-triton $ curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+    ~/python-triton $ sudo apt-get update && sudo apt-get install libsnappy-dev libzmq-dev google-cloud-sdk
+
+Start Google's Pubsub emulator:
+
+    ~/python-triton $ gcloud beta emulators pubsub start --host-port=localhost:8085
 
 The tests should all work:
 
-    ~/python-triton $ make test
+    ~/python-triton $ PUBSUB_EMULATOR_HOST=localhost:8085 make test
     .
     PASSED.  1 test / 1 case: 1 passed, 0 failed.  (Total test time 0.00s)
 
