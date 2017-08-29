@@ -1,5 +1,27 @@
+import requests
+
 from testify import *
 from google.cloud import pubsub
+
+def setup(project='integration', topic_name='foobar'):
+    topic_name = 'foobar'
+
+    client = pubsub.Client(project=project, _http=requests.Session())
+    topic = client.topic(topic_name)
+    topic.create()
+
+    sub = topic.subscription(project)
+    sub.create()
+    return client, topic, sub
+
+
+def teardown(client, topic, sub):
+    if topic is not None:
+        topic.delete()
+
+    if sub is not None:
+        sub.delete()
+
 
 def fetch_all(sub):
     results = []
@@ -13,6 +35,20 @@ def fetch_all(sub):
         sub.acknowledge([ack_id for ack_id, message in batch])
 
     return results
+
+
+def random_batch(size=100):
+    batch = []
+    for i in range(0, size):
+        record = dict(
+            blob = 'foobar',
+            timestamp = i
+        )
+
+        batch.append(record)
+
+    return batch
+
 
 def assert_stream_equals(sub, batch, decoder=None):
     pubsub_messages = fetch_all(sub)

@@ -3,6 +3,8 @@ import base64
 import time
 import logging
 import requests
+import uuid
+import itertools
 
 import msgpack
 import boto.kinesis.layer1
@@ -286,7 +288,37 @@ class Stream(object):
         return msgpack.unpackb(record_blob)
 
 
+    def __iter__(self):
+        return self.build_iterator_from_latest()
+
+
+    @abc.abstractmethod
+    def build_iterator_from_latest(self, **kwargs):
+        pass
+
+
+    @abc.abstractmethod
+    def build_iterator_from_checkpoint(self, checkpoint):
+        pass
+
 class CompositeStream(Stream):
+
+
+    class Iterator(object):
+
+
+        def __init__(self, streams, checkpoints=[]):
+            if checkpoints == []:
+                self.iterators = [stream.build_iterator_from_latest() for stream in streams]
+            else:
+                self.iterators = [stream.build_iterator_from_checkpoint(checkpoint)
+                                    for stream, checkpoint in zip(streams, checkpoints)]
+
+            self.iterator = itertools.izip_longest(*tuple(self.iterators), fillvalue=None)
+
+
+        def __iter__(self):
+            return self.iterator
 
 
     def __init__(self, streams):
@@ -301,10 +333,67 @@ class CompositeStream(Stream):
         return [stream.put_many(records) for stream in self.streams]
 
 
+    def build_iterator_from_latest(self):
+        return CompositeStream.Iterator(self.streams)
+
+
+    def build_iterator_from_checkpoint(self, checkpoints):
+        return CompositeStream.Iterator(self.streams, checkpoints)
+
+
 class GCPStream(Stream):
+
+
     # Pubsub limits as defined https://cloud.google.com/pubsub/quotas.
-    BATCH_MAX_BYTES = 10 * 1024 * 1024 # 10 MB
     BATCH_MAX_MSGS = 1000
+
+    class Iterator(object):
+
+
+        def __init__(self, stream, subscription_id=None):
+            self.stream = stream
+            self.subscription_id = subscription_id or 'trition-{}'.format(uuid.uuid4().hex)
+            self.subscription = stream.topic.subscription(self.subscription_id)
+            if subscription_id is None:
+                # If the subscription_id is provided, then
+                # it is assumed we are resuming from a previously
+                # active, named subscription.
+                self.subscription.create()
+
+            self.prefetch = []
+            self.prefetch_ack_ids = []
+            self.pending_acks = []
+            self.first_next = True
+
+
+        def __iter__(self):
+            return self
+
+
+        def next(self):
+            return self.__next__()
+
+
+        def __next__(self):
+            if self.first_next is False:
+                self.pending_acks.append(self.prefetch_ack_ids.pop(0))
+            else:
+                self.first_next = False
+
+            if len(self.prefetch) == 0:
+                if len(self.pending_acks) > 0:
+                    self.subscription.acknowledge(self.pending_acks)
+                    self.pending_acks = []
+
+                pubsub_messages = self.subscription.pull(return_immediately=False)
+                if pubsub_messages == []:
+                    raise StopIteration
+
+                for ack_id, raw_message in pubsub_messages:
+                    self.prefetch_ack_ids.append(ack_id)
+                    self.prefetch.append(self.stream.decode(raw_message))
+
+            return self.prefetch.pop(0)
 
 
     def __init__(self, project, topic, private_key_file):
@@ -321,7 +410,10 @@ class GCPStream(Stream):
             self.http = requests.Session()
 
         self.client = pubsub.Client(project, credentials=self.credentials, _http=self.http)
-        self.topic = self.client.topic(topic)
+        self.project = project
+        self.topic_name = topic
+        self.topic = self.client.topic(self.topic_name)
+
         super(GCPStream, self).__init__()
 
 
@@ -331,7 +423,6 @@ class GCPStream(Stream):
 
 
     def put(self, **record):
-        # TODO - Apply a retry policy
         msg_id = _call_and_retry(
             self.topic.publish,
             self.encode(record),
@@ -363,8 +454,17 @@ class GCPStream(Stream):
 
         return [(None, message_ids)]
 
+
     def decode(self, pubsub_message):
         return super(GCPStream, self).decode(pubsub_message.data)
+
+
+    def build_iterator_from_latest(self):
+        return GCPStream.Iterator(self)
+
+
+    def build_iterator_from_checkpoint(self, subscription_id):
+        return GCPStream.Iterator(self, subscription_id)
 
 
 class AWSStream(Stream):
