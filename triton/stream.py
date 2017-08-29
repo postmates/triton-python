@@ -385,13 +385,13 @@ class GCPStream(Stream):
                     self.subscription.acknowledge(self.pending_acks)
                     self.pending_acks = []
 
-                pubsub_messages = self.subscription.pull(return_immediately=False)
-                if pubsub_messages == []:
-                    raise StopIteration
+            pubsub_messages = self.subscription.pull(return_immediately=False)
+            for ack_id, raw_message in pubsub_messages:
+                self.prefetch_ack_ids.append(ack_id)
+                self.prefetch.append(self.stream.decode(raw_message))
 
-                for ack_id, raw_message in pubsub_messages:
-                    self.prefetch_ack_ids.append(ack_id)
-                    self.prefetch.append(self.stream.decode(raw_message))
+            if len(self.prefetch) == 0:
+                raise StopIteration
 
             return self.prefetch.pop(0)
 
