@@ -41,7 +41,7 @@ class Record(object):
 
     @classmethod
     def _decode_record_data(cls, record_data):
-        return msgpack.unpackb(base64.b64decode(record_data))
+        return msgpack.unpackb(base64.b64decode(record_data), encoding='utf-8')
 
     @classmethod
     def from_raw_record(cls, shard_id, raw_record):

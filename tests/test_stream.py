@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from testify import *
 import mock
 import base64
@@ -20,10 +22,28 @@ def generate_raw_record(n=1):
 
     return raw_record
 
+def generate_unicode_raw_record(n=42):
+    data = base64.b64encode(msgpack.packb({u'value': True, u'test_üñîçø∂é_ké¥_宇宙': u'test_üñîçø∂é_√ål_宇宙'}))
+
+    raw_record = {u'SequenceNumber': n, u'Data': data}
+
+    return raw_record
+
+def generate_escaped_unicode_raw_record(n=42):
+    data = base64.b64encode(msgpack.packb({'value': True, 'test_üñîçø∂é_ké¥_宇宙': 'test_üñîçø∂é_√ål_宇宙'}))
+
+    raw_record = {'SequenceNumber': n, 'Data': data}
+
+    return raw_record
 
 def generate_record(n=1):
     return stream.Record.from_raw_record(0, generate_raw_record(n))
 
+def generate_unicode_record(n=1):
+    return stream.Record.from_raw_record(0, generate_unicode_raw_record(n))
+
+def generate_escaped_unicode_record(n=1):
+    return stream.Record.from_raw_record(0, generate_escaped_unicode_raw_record(n))
 
 def generate_messy_test_data(primary_key='my_key'):
     data = {
@@ -53,6 +73,24 @@ class RecordTest(TestCase):
         assert_equal(r.shard_id, 0)
         assert_equal(r.data['value'], True)
 
+    def test_from_unicode_raw_record(self):
+        unicode_raw_record = generate_unicode_raw_record()
+
+        ur = stream.Record.from_raw_record(3, unicode_raw_record)
+        assert_equal(ur.seq_num, 42)
+        assert_equal(ur.shard_id, 3)
+        assert_equal(ur.data[u'value'], True)
+        assert_equal(ur.data[u'test_üñîçø∂é_ké¥_宇宙'], u'test_üñîçø∂é_√ål_宇宙')
+
+    def test_from_escaped_unicode_raw_record(self):
+        esc_unicode_raw_record = generate_escaped_unicode_raw_record()
+
+        eur = stream.Record.from_raw_record(3, esc_unicode_raw_record)
+        assert_equal(eur.seq_num, 42)
+        assert_equal(eur.shard_id, 3)
+        assert_equal(eur.data['value'], True)
+        #NOTE: escaped unicode comes out the other side as unicode
+        assert_equal(eur.data[u'test_üñîçø∂é_ké¥_宇宙'], u'test_üñîçø∂é_√ål_宇宙')
 
 class StreamIteratorTest(TestCase):
 
