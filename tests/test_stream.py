@@ -249,6 +249,22 @@ class StreamTest(TestCase):
 
         assert_equal(s._partition_key({'value': 1}), "1")
 
+    def test_unicode_partition_key(self):
+        c = turtle.Turtle()
+        s = stream.Stream(c, u'test_üñîçø∂é_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+
+        assert_equal(s._partition_key({u'ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'}), u'ünîcødé_πå®tîtîøñ_√al_宇宙')
+        #NOTE: even when we throw escaped unicode in, return unicode
+        assert_equal(s._partition_key({'ünîcødé_πå®tîtîøñ_ke¥_宇宙': 'ünîcødé_πå®tîtîøñ_√al_宇宙'}), u'ünîcødé_πå®tîtîøñ_√al_宇宙')
+
+    def test_escaped_unicode_partition_key(self):
+        c = turtle.Turtle()
+        s = stream.Stream(c, 'test_üñîçø∂é_stream', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        #NOTE: when we create a stream with escaped unicode, convert to unicode it works with unicode data
+        assert_equal(s._partition_key({u'ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'}), u'ünîcødé_πå®tîtîøñ_√al_宇宙')
+        #NOTE: even when we throw escaped unicode in, return unicode
+        assert_equal(s._partition_key({'ünîcødé_πå®tîtîøñ_ke¥_宇宙': 'ünîcødé_πå®tîtîøñ_√al_宇宙'}), u'ünîcødé_πå®tîtîøñ_√al_宇宙')
+
     def test_shards_ids(self):
         c = turtle.Turtle()
 

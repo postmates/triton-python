@@ -10,7 +10,7 @@ import boto.regioninfo
 
 from triton import errors
 from triton.checkpoint import TritonCheckpointer
-from triton.encoding import msgpack_encode_default
+from triton.encoding import msgpack_encode_default, unicode_to_ascii_str, ascii_to_unicode_str
 
 import pystatsd
 
@@ -256,12 +256,17 @@ class Stream(object):
 
     def __init__(self, conn, name, partition_key):
         self.conn = conn
-        self.name = name
-        self.partition_key = partition_key
+        self.name = ascii_to_unicode_str(name)
+        self.partition_key = ascii_to_unicode_str(partition_key)
         self._shard_ids = None
 
     def _partition_key(self, data):
-        return unicode(data[self.partition_key])
+        try:
+            return ascii_to_unicode_str(data[self.partition_key])
+        except KeyError:
+            #supports a user putting escaped unicode data in, still returns
+            #unicode partition key
+            return ascii_to_unicode_str(data[unicode_to_ascii_str(self.partition_key)])
 
     @property
     def shard_ids(self):
