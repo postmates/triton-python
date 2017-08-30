@@ -425,7 +425,7 @@ class GCPStream(Stream):
             )
 
         # topic.batch defines an iterator over message_ids.
-        return [(None, message_id) for message_id in list(topic_batch)]
+        return [(None, message_id) for message_id in topic_batch]
 
     def decode(self, pubsub_message):
         return super(GCPStream, self).decode(pubsub_message.data)
