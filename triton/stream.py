@@ -440,11 +440,7 @@ class GCPStream(Stream):
 class AWSStream(Stream):
 
     def __init__(self, name, partition_key, conn=None, region='us-east-1'):
-        if conn is not None:
-            self.conn = conn
-        else:
-            self.conn = connect_to_region(region)
-
+        self.conn = conn or connect_to_region(region)
         self.name = name
         self.partition_key = partition_key
         self._shard_ids = None
