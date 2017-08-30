@@ -12,6 +12,7 @@ import msgpack
 
 from triton import stream
 from triton import errors
+from triton.encoding import ascii_to_unicode_str
 from boto.exception import BotoServerError
 
 
@@ -56,6 +57,25 @@ def generate_messy_test_data(primary_key='my_key'):
     }
     return data
 
+def generate_unicode_test_data(primary_key=u'my_key'):
+    data = {
+        u'pkey': primary_key,
+        u'value': True,
+        u'ascii_key': u'sømé_ünîcode_vàl',
+        u'ünîcødé_key': u'ascii_val',
+        u'ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'
+    }
+    return data
+
+def generate_escaped_unicode_test_data(primary_key='my_key'):
+    data = {
+        'pkey': primary_key,
+        'value': True,
+        'ascii_key': 'sømé_ünîcode_vàl',
+        'ünîcødé_key': 'ascii_val',
+        'ünîcødé_πå®tîtîøñ_ke¥_宇宙': 'ünîcødé_πå®tîtîøñ_√al_宇宙'
+    }
+    return data
 
 class Point(object):
 
@@ -351,6 +371,49 @@ class StreamTest(TestCase):
         assert_equal(
             sent_data['point'],
             str(test_data['point'].coords))
+
+    def test_put_unicode_data(self):
+        c = turtle.Turtle()
+
+        mock_sent_message_data = list()
+
+        def put_record(*args):
+            mock_sent_message_data.append(args[1])
+            return {u'ShardId': u'0001', u'SequenceNumber': 1}
+
+        c.put_record = put_record
+
+        s = stream.Stream(c, u'tést_üñîçødé_stream_宇宙', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+
+        test_data = generate_unicode_test_data()
+        s.put(**test_data)
+
+        sent_data = msgpack.unpackb(mock_sent_message_data[0], encoding='utf-8')
+
+        assert_equal(sent_data[u'pkey'], test_data[u'pkey'])
+        assert_equal(sent_data[u'ünîcødé_πå®tîtîøñ_ke¥_宇宙'], test_data[u'ünîcødé_πå®tîtîøñ_ke¥_宇宙'])
+
+    def test_put_escaped_unicode_data(self):
+        c = turtle.Turtle()
+
+        mock_sent_message_data = list()
+
+        def put_record(*args):
+            mock_sent_message_data.append(args[1])
+            return {'ShardId': u'0001', 'SequenceNumber': 1}
+
+        c.put_record = put_record
+
+        s = stream.Stream(c, 'tést_üñîçødé_stream_宇宙', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+
+        test_data = generate_escaped_unicode_test_data()
+        s.put(**test_data)
+
+        sent_data = msgpack.unpackb(mock_sent_message_data[0], encoding='utf-8')
+
+        assert_equal(sent_data['pkey'], test_data['pkey'])
+        #NOTE that escaped ascii data comes out as unicode, courtesy of the encoding='utf-8' to msgpack.unpackb
+        assert_equal(sent_data[u'ünîcødé_πå®tîtîøñ_ke¥_宇宙'], ascii_to_unicode_str(test_data['ünîcødé_πå®tîtîøñ_ke¥_宇宙']))
 
     def test_put_fail(self):
         c = turtle.Turtle()
