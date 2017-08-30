@@ -262,16 +262,13 @@ class CombinedStreamIterator(object):
 class Stream(object):
     __metaclass__ = abc.ABCMeta
 
-
     @abc.abstractmethod
     def put(self, **record):
         pass
 
-
     @abc.abstractmethod
     def put_many(self, records):
         pass
-
 
     def encode(self, record):
         try:
@@ -283,29 +280,24 @@ class Stream(object):
 
         return data
 
-
     def decode(self, record_blob):
         return msgpack.unpackb(record_blob)
 
-
     def __iter__(self):
         return self.build_iterator_from_latest()
-
 
     @abc.abstractmethod
     def build_iterator_from_latest(self, **kwargs):
         pass
 
-
     @abc.abstractmethod
     def build_iterator_from_checkpoint(self, checkpoint):
         pass
 
+
 class CompositeStream(Stream):
 
-
     class Iterator(object):
-
 
         def __init__(self, streams, checkpoints=[]):
             if checkpoints == []:
@@ -316,26 +308,20 @@ class CompositeStream(Stream):
 
             self.iterator = itertools.izip_longest(*tuple(self.iterators), fillvalue=None)
 
-
         def __iter__(self):
             return self.iterator
-
 
     def __init__(self, streams):
         self.streams = streams
 
-
     def put(self, **record):
         return [stream.put(**record) for stream in self.streams]
-
 
     def put_many(self, records):
         return [stream.put_many(records) for stream in self.streams]
 
-
     def build_iterator_from_latest(self):
         return CompositeStream.Iterator(self.streams)
-
 
     def build_iterator_from_checkpoint(self, checkpoints):
         return CompositeStream.Iterator(self.streams, checkpoints)
@@ -343,12 +329,10 @@ class CompositeStream(Stream):
 
 class GCPStream(Stream):
 
-
     # Pubsub limits as defined https://cloud.google.com/pubsub/quotas.
     BATCH_MAX_MSGS = 1000
 
     class Iterator(object):
-
 
         def __init__(self, stream, subscription_id=None):
             self.stream = stream
@@ -365,14 +349,8 @@ class GCPStream(Stream):
             self.pending_acks = []
             self.first_next = True
 
-
         def __iter__(self):
             return self
-
-
-        def next(self):
-            return self.__next__()
-
 
         def __next__(self):
             if self.first_next is False:
@@ -395,6 +373,7 @@ class GCPStream(Stream):
 
             return self.prefetch.pop(0)
 
+        next = __next__
 
     def __init__(self, project, topic, private_key_file):
         self.http = None
@@ -416,11 +395,9 @@ class GCPStream(Stream):
 
         super(GCPStream, self).__init__()
 
-
     @staticmethod
     def retry_policy(e):
         return True
-
 
     def put(self, **record):
         msg_id = _call_and_retry(
@@ -430,12 +407,11 @@ class GCPStream(Stream):
 
         return (None, msg_id)
 
-
     def put_many(self, records):
         message_ids = []
         packed = [self.encode(record) for record in records]
 
-        with self.topic.batch(max_messages = self.BATCH_MAX_MSGS) as topic_batch:
+        with self.topic.batch(max_messages=self.BATCH_MAX_MSGS) as topic_batch:
             for pack in packed:
                 _call_and_retry(
                     topic_batch.publish,
@@ -445,23 +421,17 @@ class GCPStream(Stream):
 
             _call_and_retry(
                 topic_batch.commit,
-                retry_on_exception = self.retry_policy
+                retry_on_exception=self.retry_policy
             )
 
-            # topic.batch defines an iterator
-            # over message_ids.
-            message_ids = list(topic_batch)
-
-        return [(None, message_ids)]
-
+        # topic.batch defines an iterator over message_ids.
+        return [(None, message_id) for message_id in list(topic_batch)]
 
     def decode(self, pubsub_message):
         return super(GCPStream, self).decode(pubsub_message.data)
 
-
     def build_iterator_from_latest(self):
         return GCPStream.Iterator(self)
-
 
     def build_iterator_from_checkpoint(self, subscription_id):
         return GCPStream.Iterator(self, subscription_id)
@@ -469,7 +439,7 @@ class GCPStream(Stream):
 
 class AWSStream(Stream):
 
-    def __init__(self, name, partition_key, conn = None, region='us-east-1'):
+    def __init__(self, name, partition_key, conn=None, region='us-east-1'):
         if conn is not None:
             self.conn = conn
         else:
@@ -525,7 +495,7 @@ class AWSStream(Stream):
             self.conn.put_record,
             self.name, data,
             self._partition_key(kwargs),
-            retry_on_exception = self.retry_policy
+            retry_on_exception=self.retry_policy
         )
 
         try:
@@ -661,12 +631,13 @@ def get_stream(stream_name, config):
 
 
 def get_stream_by_provider(stream_name, stream_config):
-    provider = stream_config.pop('provider', config.PROVIDER_AWS)
+    stream_config_copy = stream_config.copy()
+    provider = stream_config_copy.pop('provider', config.PROVIDER_AWS)
 
     if provider == config.PROVIDER_AWS:
-        return AWSStream(**stream_config)
+        return AWSStream(**stream_config_copy)
     else:
-        return GCPStream(**stream_config)
+        return GCPStream(**stream_config_copy)
 
 
 def _call_and_retry(function, *args, **kwargs):

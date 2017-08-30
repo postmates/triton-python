@@ -47,7 +47,7 @@ def load_config(file_name):
         required_keys = REQUIRED_CONFIG_KEYS_AWS_V2 if provider == PROVIDER_AWS else REQUIRED_CONFIG_KEYS_GCP_V2
         _validate_config(stream_name, stream_config, required_keys)
 
-    return dict(provider = provider, **config_dict)
+    return dict(provider=provider, **config_dict)
 
 
 def get_zmq_config():

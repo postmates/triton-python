@@ -1,7 +1,8 @@
 import requests
 
-from testify import *
+from testify import assert_truthy, assert_equal
 from google.cloud import pubsub
+
 
 def setup(project='integration', topic_name='foobar'):
     topic_name = 'foobar'
@@ -41,8 +42,8 @@ def random_batch(size=100):
     batch = []
     for i in range(0, size):
         record = dict(
-            blob = 'foobar',
-            timestamp = i
+            blob='foobar',
+            timestamp=i
         )
 
         batch.append(record)

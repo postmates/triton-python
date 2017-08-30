@@ -6,47 +6,40 @@ from testify import *
 from google.cloud import pubsub
 from triton import stream
 
+
 class FaultyGCPException(Exception):
     pass
 
+
 class FaultyGCPStream(stream.GCPStream):
 
-
     class EmptyIterator(object):
-
 
         def __iter__(self):
             return self
 
-
         def __next__(self):
             raise StopIteration
 
-
         def next(self):
             return self.__next__()
-
 
     def __init__(self, raise_exception=True, **kwargs):
         self.raise_exception = raise_exception
         super(FaultyGCPStream, self).__init__(**kwargs)
 
-
     def put_many(self, records):
         if self.raise_exception:
             raise FaultyGCPException("oops")
 
-
     def __iter__(self):
         return self.build_iterator_from_latest()
-
 
     def build_iterator_from_latest(self):
         return FaultyGCPStream.EmptyIterator()
 
 
 class CompositeTest(TestCase):
-
 
     @setup
     def setup(self):
@@ -60,19 +53,17 @@ class CompositeTest(TestCase):
         self.sub = self.topic.subscription(self.project)
         self.sub.create()
 
-
     @teardown
     def cleanup(self):
         self.topic.delete()
         self.sub.delete()
-
 
     def test_construction(self):
         kinesis_config = dict(
             name='my_kinesis_stream',
             partition_key='value',
             region='us-west-1',
-            conn = requests.Session())
+            conn=requests.Session())
 
         pubsub_config = dict(
             provider='gcp',
@@ -92,7 +83,6 @@ class CompositeTest(TestCase):
         assert_equal(type(composite_stream.streams[0]), stream.AWSStream)
         assert_equal(type(composite_stream.streams[1]), stream.GCPStream)
 
-
     def test_multiplexing(self):
         pubsub_config = dict(
             provider='gcp',
@@ -111,9 +101,8 @@ class CompositeTest(TestCase):
         batch = [dict(blob=blob) for blob in ['foobar', 'baz', 'foomatic']]
         composite_stream.put_many(batch)
 
-        #Expect to receive 2x back again
+        # Expect to receive 2x back again
         pubsub_util.assert_stream_equals(self.sub, batch + batch, decoder=composite_stream.streams[0].decode)
-
 
     def test_exception_results_in_loss_of_parity(self):
         """
@@ -137,9 +126,8 @@ class CompositeTest(TestCase):
 
         pubsub_util.assert_stream_equals(self.sub, batch, decoder=good_pubsub.decode)
 
+
 class CompositeIteratorTest(TestCase):
-
-
 
     @setup
     def setup(self):
@@ -153,12 +141,10 @@ class CompositeIteratorTest(TestCase):
         self.sub = self.topic.subscription(self.project)
         self.sub.create()
 
-
     @teardown
     def cleanup(self):
         self.topic.delete()
         self.sub.delete()
-
 
     def get_stream(self):
         pubsub_config = dict(
@@ -174,7 +160,6 @@ class CompositeIteratorTest(TestCase):
 
         config = dict(my_composite_stream=composite_config)
         return triton.get_stream('my_composite_stream', config)
-
 
     def test_iterator_latest(self):
         stream = self.get_stream()
@@ -198,7 +183,6 @@ class CompositeIteratorTest(TestCase):
         for message in batch:
             assert_truthy(message in acc1)
 
-
     def test_iterator_checkpoint(self):
         stream = self.get_stream()
 
@@ -219,7 +203,6 @@ class CompositeIteratorTest(TestCase):
         stream.put_many(second_batch)
         combo_iter = stream.build_iterator_from_checkpoint([subscription_id1, subscription_id2])
 
-
         acc1 = []
         acc2 = []
         for record1, record2 in combo_iter:
@@ -237,7 +220,6 @@ class CompositeIteratorTest(TestCase):
 
         for message in second_batch:
             assert_truthy(message in acc1)
-
 
     def test_iterator_favors_longest(self):
         batch = pubsub_util.random_batch(size=15)

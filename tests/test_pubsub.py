@@ -1,20 +1,18 @@
 import os
 
-import requests
 import triton
 import pubsub_util
 import google.cloud.exceptions
 
 from testify import *
-from google.cloud import pubsub
 from triton import stream
 
 BATCH_MAX_MSGS = stream.GCPStream.BATCH_MAX_MSGS
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-class GCPTest(TestCase):
 
+class GCPTest(TestCase):
 
     @setup
     def setup(self):
@@ -22,14 +20,12 @@ class GCPTest(TestCase):
         self.topic_name = 'foobar'
         self.client, self.topic, self.sub = pubsub_util.setup(self.project, self.topic_name)
 
-
     @teardown
     def cleanup(self):
         pubsub_util.teardown(
             self.client,
             self.topic,
             self.sub)
-
 
     def get_stream(self):
         pubsub_config = dict(
@@ -39,26 +35,23 @@ class GCPTest(TestCase):
             private_key_file=None)
 
         config = dict(
-            test_stream = pubsub_config)
+            test_stream=pubsub_config)
 
         return triton.get_stream('test_stream', config)
 
-
     def test_construction(self):
-        stream = self.get_stream()
+        self.get_stream()
         assert_truthy(True) # Just ensure we survive
-
 
     def test_publish_oneoff(self):
         stream = self.get_stream()
         record = dict(
-            blob = 'foobar',
-            timestamp = 10234
+            blob='foobar',
+            timestamp=10234
         )
         stream.put(**record)
 
         pubsub_util.assert_stream_equals(self.sub, [record], decoder=stream.decode)
-
 
     def test_publish_batch(self):
         stream = self.get_stream()
@@ -66,14 +59,13 @@ class GCPTest(TestCase):
         batch = []
         for i in range(0, 101):
             record = dict(
-                blob = 'foobar',
-                timestamp = i
+                blob='foobar',
+                timestamp=i
             )
             batch.append(record)
 
         stream.put_many(batch)
         pubsub_util.assert_stream_equals(self.sub, batch, decoder=stream.decode)
-
 
     def test_publish_batch_larger_than_limits(self):
         stream = self.get_stream()
@@ -82,7 +74,6 @@ class GCPTest(TestCase):
         stream.put_many(batch)
 
         pubsub_util.assert_stream_equals(self.sub, batch, decoder=stream.decode)
-
 
     def test_publish_batch_has_too_many_bytes(self):
         stream = self.get_stream()
@@ -95,13 +86,11 @@ class GCPTest(TestCase):
 
 class GCPStreamIteratorTest(TestCase):
 
-
     @setup
     def setup(self):
         self.project = 'integration'
         self.topic_name = 'foobar'
         self.client, self.topic, self.sub = pubsub_util.setup(self.project, self.topic_name)
-
 
     @teardown
     def cleanup(self):
@@ -109,7 +98,6 @@ class GCPStreamIteratorTest(TestCase):
             self.client,
             self.topic,
             self.sub)
-
 
     def get_stream(self):
         pubsub_config = dict(
@@ -119,10 +107,9 @@ class GCPStreamIteratorTest(TestCase):
             private_key_file=None)
 
         config = dict(
-            test_stream = pubsub_config)
+            test_stream=pubsub_config)
 
         return triton.get_stream('test_stream', config)
-
 
     def test_latest_iterator_is_default(self):
         stream = self.get_stream()
@@ -135,7 +122,6 @@ class GCPStreamIteratorTest(TestCase):
         # should go unnoticed.
         for msg in stream:
             assert_truthy(False)
-
 
     def test_latest_iterator(self):
         stream = self.get_stream()
@@ -185,7 +171,6 @@ class GCPStreamIteratorTest(TestCase):
                 break
 
         sub.delete()
-
 
     def test_checkpoint_iterator_raises_when_sub_dne(self):
         stream = self.get_stream()
