@@ -16,7 +16,9 @@ REQUIRED_CONFIG_KEYS = ['name', 'partition_key']
 
 _zmq_config = None
 
-
+#NOTE: when loading config dictionary, yaml automatically converts unicode
+#in the yaml file to unicode in the dictionary. Dictionary will still contain
+#ascii keys and values for ascii bits of yaml file
 def load_config(file_name):
     try:
         config_dict = yaml.load(io.open(file_name))
