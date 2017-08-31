@@ -131,7 +131,7 @@ class StreamArchiveReaderShortTest(TestCase):
     def create_unicode_data(self):
         unicode_writer = store.StreamArchiveWriter(
                                                 {u'name': u'føø_üñîçødé_宇宙'},
-                                                datetime.datetime.utcnow(), u'/tmp/uni/')
+                                                datetime.datetime.utcnow(), u'/tmp/uni')
         self.unicode_file_path = unicode_writer.file_path
 
         unicode_writer.put(ts=time.time(), value=u"hello_üñîçødé_宇宙")
@@ -142,7 +142,7 @@ class StreamArchiveReaderShortTest(TestCase):
     def create_escaped_unicode_data(self):
         escaped_unicode_writer = store.StreamArchiveWriter(
                                                 {'name': 'føø_üñîçødé_宇宙_escaped'},
-                                                datetime.datetime.utcnow(), '/tmp/uni-esc/')
+                                                datetime.datetime.utcnow(), '/tmp/uni-esc')
         self.escaped_unicode_file_path = escaped_unicode_writer.file_path
 
         escaped_unicode_writer.put(ts=time.time(), value="hello_üñîçødé_宇宙")
@@ -211,8 +211,8 @@ class StreamArchiveReaderFullTest(TestCase):
 
     @setup
     def create_unicode_data(self):
-        unicode_writer = store.StreamArchiveWriter({'name': "üñîçødé_foo_宇宙"},
-                                           datetime.datetime.utcnow(), "/tmp/uni")
+        unicode_writer = store.StreamArchiveWriter({u'name': u"üñîçødé_foo_宇宙"},
+                                           datetime.datetime.utcnow(), u"/tmp/uni")
         self.unicode_file_path = unicode_writer.file_path
 
         # We want multiple objects, in multiple snappy frames
@@ -221,10 +221,27 @@ class StreamArchiveReaderFullTest(TestCase):
 
         unicode_writer.flush()
 
-        unicode_writer.put(ts=time.time(), value="hello 2 宇宙 üñîçodé")
-        unicode_writer.put(ts=time.time(), value="hello 3 宇宙 µø®é üñîçødé")
+        unicode_writer.put(ts=time.time(), value=u"hello 2 宇宙 üñîçodé")
+        unicode_writer.put(ts=time.time(), value=u"hello 3 宇宙 µø®é üñîçødé")
 
         unicode_writer.close()
+
+    @setup
+    def create_escaped_unicode_data(self):
+        escaped_unicode_writer = store.StreamArchiveWriter({'name': "üñîçødé_foo_宇宙_esc"},
+                                           datetime.datetime.utcnow(), "/tmp/uni-esc")
+        self.escaped_unicode_file_path = escaped_unicode_writer.file_path
+
+        # We want multiple objects, in multiple snappy frames
+        escaped_unicode_writer.put(ts=time.time(), value="hello üñîçodé 宇宙")
+        escaped_unicode_writer.put(ts=time.time(), value="hello 1 µø®é üñîçødé 宇宙")
+
+        escaped_unicode_writer.flush()
+
+        escaped_unicode_writer.put(ts=time.time(), value="hello 2 宇宙 üñîçodé")
+        escaped_unicode_writer.put(ts=time.time(), value="hello 3 宇宙 µø®é üñîçødé")
+
+        escaped_unicode_writer.close()
 
     @setup
     def build_reader(self):
@@ -233,6 +250,10 @@ class StreamArchiveReaderFullTest(TestCase):
     @setup
     def build_unicode_reader(self):
         self.unicode_reader = store.StreamArchiveReader(self.unicode_file_path)
+
+    @setup
+    def build_escaped_unicode_reader(self):
+        self.escaped_unicode_reader = store.StreamArchiveReader(self.escaped_unicode_file_path)
 
     def test(self):
         recs = list(self.reader)
@@ -248,7 +269,16 @@ class StreamArchiveReaderFullTest(TestCase):
         assert_equal(u_recs[0][u'value'], u"hello üñîçodé 宇宙")
         assert_equal(u_recs[3][u'value'], u"hello 3 宇宙 µø®é üñîçødé")
 
+    #NOTE: as usual, anything put in as escaped unicode will come out as unicode!
+    def test_escaped_unicode(self):
+        ue_recs = list(self.escaped_unicode_reader)
+
+        assert_equal(len(ue_recs), 4)
+        assert_equal(ue_recs[0]['value'], u"hello üñîçodé 宇宙")
+        assert_equal(ue_recs[3]['value'], u"hello 3 宇宙 µø®é üñîçødé")
+
     @teardown
     def cleanup_data(self):
         shutil.rmtree(os.path.dirname(self.file_path))
         shutil.rmtree(os.path.dirname(self.unicode_file_path))
+        shutil.rmtree(os.path.dirname(self.escaped_unicode_file_path))
