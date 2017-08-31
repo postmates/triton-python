@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from testify import *
 import datetime
 import time
@@ -14,11 +15,19 @@ class StreamArchiveWriterFilePathTest(TestCase):
         self.dt = datetime.datetime(2015, 7, 24)
         self.stream = store.StreamArchiveWriter({'name': "foo"}, self.dt,
                                                 "/tmp")
+        self.unicode_stream = store.StreamArchiveWriter(
+                                                {u'name': u'føø_üñîçødé_宇宙'},
+                                                self.dt, u'/tµπ_üñîçødé_宇宙')
 
     def test(self):
         assert self.stream.file_path.startswith(
             "/tmp/20150724/foo-archive-"), self.stream.file_path
         assert self.stream.file_path.endswith('.tri')
+
+    def test_unicode(self):
+        assert self.unicode_stream.file_path.startswith(
+            u'/tµπ_üñîçødé_宇宙/20150724/føø_üñîçødé_宇宙-archive-'), self.unicode_stream.file_path
+        assert self.unicode_stream.file_path.endswith(u'.tri')
 
 
 class StreamArchiveWriterWriteTest(TestCase):
@@ -28,6 +37,9 @@ class StreamArchiveWriterWriteTest(TestCase):
         self.dt = datetime.datetime(2015, 7, 24)
         self.stream = store.StreamArchiveWriter({'name': "foo"}, self.dt,
                                                 "/tmp")
+        # self.unicode_stream = store.StreamArchiveWriter(
+        #                                         {u'name': u'føø_üñîçødé_宇宙'},
+        #                                         self.dt, u'/tµπ_üñîçødé_宇宙')
 
     def test_buffer(self):
         self.stream.put(ts=time.time(), value="hello")

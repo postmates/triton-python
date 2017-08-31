@@ -18,7 +18,7 @@ _zmq_config = None
 
 #NOTE: when loading config dictionary, yaml automatically converts unicode
 #in the yaml file to unicode in the dictionary. Dictionary will still contain
-#ascii keys and values for ascii bits of yaml file
+#ascii keys and values for ascii strings in the yaml file
 def load_config(file_name):
     try:
         config_dict = yaml.load(io.open(file_name))
