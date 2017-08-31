@@ -210,8 +210,29 @@ class StreamArchiveReaderFullTest(TestCase):
         writer.close()
 
     @setup
+    def create_unicode_data(self):
+        unicode_writer = store.StreamArchiveWriter({'name': "üñîçødé_foo_宇宙"},
+                                           datetime.datetime.utcnow(), "/tmp/uni")
+        self.unicode_file_path = unicode_writer.file_path
+
+        # We want multiple objects, in multiple snappy frames
+        unicode_writer.put(ts=time.time(), value=u"hello üñîçodé 宇宙")
+        unicode_writer.put(ts=time.time(), value=u"hello 1 µø®é üñîçødé 宇宙")
+
+        unicode_writer.flush()
+
+        unicode_writer.put(ts=time.time(), value="hello 2 宇宙 üñîçodé")
+        unicode_writer.put(ts=time.time(), value="hello 3 宇宙 µø®é üñîçødé")
+
+        unicode_writer.close()
+
+    @setup
     def build_reader(self):
         self.reader = store.StreamArchiveReader(self.file_path)
+
+    @setup
+    def build_unicode_reader(self):
+        self.unicode_reader = store.StreamArchiveReader(self.unicode_file_path)
 
     def test(self):
         recs = list(self.reader)
@@ -220,6 +241,14 @@ class StreamArchiveReaderFullTest(TestCase):
         assert_equal(recs[0]['value'], "hello")
         assert_equal(recs[3]['value'], "hello 3")
 
+    def test_unicode(self):
+        u_recs = list(self.unicode_reader)
+
+        assert_equal(len(u_recs), 4)
+        assert_equal(u_recs[0][u'value'], u"hello üñîçodé 宇宙")
+        assert_equal(u_recs[3][u'value'], u"hello 3 宇宙 µø®é üñîçødé")
+
     @teardown
     def cleanup_data(self):
         shutil.rmtree(os.path.dirname(self.file_path))
+        shutil.rmtree(os.path.dirname(self.unicode_file_path))
