@@ -11,6 +11,7 @@ import msgpack
 import snappy
 import boto.s3
 from boto.s3.connection import OrdinaryCallingFormat
+from encoding import ascii_to_unicode_str
 
 MAX_BUFFER_SIZE = 1024 * 1024
 
@@ -31,7 +32,7 @@ class StreamArchiveWriter(object):
     @property
     def file_path(self):
         date_str = self.base_dt.strftime('%Y%m%d')
-        file_name = "{}-archive-{}.tri".format(self.config['name'],
+        file_name = "{}-archive-{}.tri".format(ascii_to_unicode_str(self.config['name']),
                                                int(self.ts))
         return os.path.join(self.base_path, date_str, file_name)
 
@@ -75,7 +76,7 @@ def decoder(stream):
     """Generator that processes data from the stream (by iterating) and yields
     triton records"""
     snappy_stream = snappy.StreamDecompressor()
-    unpacker = msgpack.Unpacker()
+    unpacker = msgpack.Unpacker(encoding='utf-8')
     for data in stream:
         buf = snappy_stream.decompress(data)
         if buf:
