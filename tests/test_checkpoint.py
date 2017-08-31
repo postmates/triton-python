@@ -7,6 +7,7 @@ import msgpack
 import base64
 
 from triton import checkpoint, stream
+from triton.encoding import ascii_to_unicode_str
 
 CLIENT_NAME = 'test_client'
 
@@ -65,6 +66,25 @@ class CheckpointTest(TestCase):
             chkpt.checkpoint(shard_id, seq_no)
             last = chkpt.last_sequence_number(shard_id)
             assert_truthy(last == seq_no)
+    def test_new_unicode_checkpoint(self):
+        stream_name = u'test1'
+        shard_id = u'shardId-000000000000'
+        patch_string = u'triton.checkpoint.get_triton_connection_pool'
+        with mock.patch(patch_string, new=lambda: self.pool):
+            chkpt = TritonCheckpointerTest(
+                stream_name, client_name=ascii_to_unicode_str(CLIENT_NAME))
+            last = chkpt.last_sequence_number(shard_id)
+            assert_truthy(last is None)
+
+            seq_no = u'1234'
+            chkpt.checkpoint(shard_id, seq_no)
+            last = chkpt.last_sequence_number(shard_id)
+            assert_truthy(last == seq_no)
+
+            seq_no = u'456'
+            chkpt.checkpoint(shard_id, seq_no)
+            last = chkpt.last_sequence_number(shard_id)
+            assert_truthy(last == seq_no)
 
 
 def generate_raw_record(seq_no):
@@ -74,6 +94,12 @@ def generate_raw_record(seq_no):
 
     return raw_record
 
+def generate_unicode_raw_record(seq_no):
+    data = base64.b64encode(msgpack.packb({u'value': True, u'test_üñîçø∂é_ké¥_宇宙': u'test_üñîçø∂é_√ål_宇宙'}))
+
+    raw_record = {u'SequenceNumber': seq_no, u'Data': data}
+
+    return raw_record
 
 def get_records(n, offset=0, *args, **kwargs):
     n = int(n)
@@ -85,6 +111,15 @@ def get_records(n, offset=0, *args, **kwargs):
         'Records': records
     }
 
+def get_unicode_records(n, offset=0, *args, **kwargs):
+    n = int(n)
+    offset = int(offset)
+    records = [generate_unicode_raw_record(str(i + offset)) for i in range(n)]
+    return {
+        u'NextShardIterator': n + offset,
+        u'MillisBehindLatest': 0,
+        u'Records': records
+    }
 
 def get_batches_of_10_records(
     iter_val, *args, **kwargs
@@ -92,6 +127,11 @@ def get_batches_of_10_records(
     recs = get_records(10, iter_val)
     return recs
 
+def get_batches_of_10_unicode_records(
+    iter_val, *args, **kwargs
+):
+    recs = get_unicode_records(10, iter_val)
+    return recs
 
 class StreamIteratorCheckpointTest(TestCase):
     """Test end to end checkpoint functionality"""
@@ -116,6 +156,32 @@ class StreamIteratorCheckpointTest(TestCase):
 
                 def get_20_records(*args, **kwargs):
                     return get_records(20)
+
+                s.conn.get_records = get_20_records
+
+                i = stream.StreamIterator(s, shard_id, stream.ITER_TYPE_LATEST)
+                i._iter_value = 1
+
+                for j in range(10):
+                    val = i.next()
+                i.checkpoint()
+
+                last_chkpt_seqno = i.checkpointer.last_sequence_number(
+                    shard_id)
+                assert_truthy(val.seq_num == last_chkpt_seqno)
+
+    def test_unicode_iterator_checkpoint(self):
+        stream_name = u'test1_üñîçødé'
+        shard_id = u'shardId-üñîçødé-000000000000'
+        pool_patch = u'triton.checkpoint.get_triton_connection_pool'
+        chkpt_patch = u'triton.stream.TritonCheckpointer'
+        with mock.patch(pool_patch, new=lambda: self.pool):
+            with mock.patch(chkpt_patch, new=TritonCheckpointerTest):
+                s = turtle.Turtle()
+                s.name = stream_name
+
+                def get_20_records(*args, **kwargs):
+                    return get_unicode_records(20)
 
                 s.conn.get_records = get_20_records
 
