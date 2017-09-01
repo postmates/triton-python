@@ -11,7 +11,7 @@ import msgpack
 import snappy
 import boto.s3
 from boto.s3.connection import OrdinaryCallingFormat
-from encoding import ascii_to_unicode_str
+from encoding import ascii_to_unicode_str, unicode_to_ascii_str
 
 MAX_BUFFER_SIZE = 1024 * 1024
 
@@ -54,7 +54,7 @@ class StreamArchiveWriter(object):
             except OSError:
                 pass
 
-            self.writer = io.open(self.file_path, mode="wb")
+            self.writer = io.open(unicode_to_ascii_str(self.file_path), mode=str("wb"))
             self.snappy_compressor = snappy.StreamCompressor()
 
         data = self.snappy_compressor.add_chunk(self.buffer.getvalue())
