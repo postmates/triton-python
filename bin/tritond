@@ -10,6 +10,7 @@ Logging daemon for non-blocking triton events.
 Adapted from https://github.com/rhettg/BlueOx/blob/master/bin/oxd
 
 """
+from __future__ import unicode_literals
 import argparse
 import errno
 import sys
