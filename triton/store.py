@@ -1,4 +1,3 @@
-from __future__ import unicode_literals
 import time
 import io
 import datetime
@@ -92,7 +91,7 @@ class StreamArchiveReader(object):
         self.file_path = file_path
 
     def __iter__(self):
-        f = io.open(self.file_path, mode="rb")
+        f = io.open(unicode_to_ascii_str(self.file_path), mode="rb")
         return decoder(f)
 
 
