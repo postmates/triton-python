@@ -96,7 +96,7 @@ class StreamArchiveWriterWriteTest(TestCase):
 
         assert_equal(self.unicode_stream.buffer.tell(), 0)
         assert self.unicode_stream.writer
-        assert os.path.exists(self.unicode_stream.file_path)
+        assert os.path.exists(unicode_to_ascii_str(self.unicode_stream.file_path))
 
         shutil.rmtree(os.path.dirname(self.unicode_stream.file_path))
 
@@ -111,7 +111,7 @@ class StreamArchiveWriterWriteTest(TestCase):
 
         assert_equal(self.escaped_unicode_stream.buffer.tell(), 0)
         assert self.escaped_unicode_stream.writer
-        assert os.path.exists(self.escaped_unicode_stream.file_path)
+        assert os.path.exists(unicode_to_ascii_str(self.escaped_unicode_stream.file_path))
 
         shutil.rmtree(os.path.dirname(self.escaped_unicode_stream.file_path))
 
@@ -187,7 +187,7 @@ class StreamArchiveReaderShortTest(TestCase):
     @teardown
     def cleanup_data(self):
         shutil.rmtree(os.path.dirname(self.file_path))
-        shutil.rmtree(os.path.dirname(self.unicode_file_path))
+        shutil.rmtree(os.path.dirname(unicode_to_ascii_str(self.unicode_file_path)))
         shutil.rmtree(os.path.dirname(self.escaped_unicode_file_path))
 
 
