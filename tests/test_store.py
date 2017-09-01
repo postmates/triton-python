@@ -6,6 +6,7 @@ import os.path
 import shutil
 
 from triton import store
+from triton.encoding import unicode_to_ascii_str
 
 
 class StreamArchiveWriterFilePathTest(TestCase):
@@ -280,5 +281,5 @@ class StreamArchiveReaderFullTest(TestCase):
     @teardown
     def cleanup_data(self):
         shutil.rmtree(os.path.dirname(self.file_path))
-        shutil.rmtree(os.path.dirname(self.unicode_file_path))
+        shutil.rmtree(os.path.dirname(unicode_to_ascii_str(self.unicode_file_path)))
         shutil.rmtree(os.path.dirname(self.escaped_unicode_file_path))
