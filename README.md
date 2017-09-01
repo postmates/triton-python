@@ -83,7 +83,7 @@ This guarantees that the write has succeeded before continuing the flow of contr
 To allow for writes that do not block, triton comes with `tritond`;
 a daemon that will spool Kinesis messages to local memory and write those messages to Kinesis asynchronously.
 Writes via this pathway block for approximately 0.1 ms.
-The `tritond` spools messages to memory and writes all recieved messages to Kinesis
+The `tritond` spools messages to memory and writes all received messages to Kinesis
 every 100 ms.
 It is important to note that using this non-blocking pathway eliminates the guarantee
 that data will be written to Kinesis.
@@ -113,7 +113,7 @@ Once `tritond` is running, usage follows the basic write pattern:
     s.put(value='hi mom', ts=time.time())
 
 Since the actual Kinesis write happens asynchronously, the shard and sequence number
-are not returned from this operation. 
+are not returned from this operation.
 Also, as mentioned above, Triton currently only supports data types directly converatible
 into [msgpack formated data](https://github.com/msgpack/msgpack/blob/master/spec.md).
 For data put into a `NonblockingStream` object, unsupported types will log an error and continue.
@@ -184,7 +184,7 @@ The DB also needs to have a specific table created; calling the following will i
 
 Triton checkpointing also requires a unique client name, since the basic
 assumption is that the checkpoint DB will be shared. The client name is specified
-by the ENV variable `TRITON_CLIENT_NAME`. 
+by the ENV variable `TRITON_CLIENT_NAME`.
 Attempting to checkpoint without this ENV variable will also raise a
 `TritonCheckpointError` exception.
 
