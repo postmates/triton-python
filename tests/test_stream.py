@@ -271,7 +271,7 @@ class StreamTest(TestCase):
 
     def test_unicode_partition_key(self):
         c = turtle.Turtle()
-        s = stream.Stream(c, u'test_üñîçø∂é_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        s = stream.AWSStream(u'test_üñîçø∂é_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
 
         assert_equal(s._partition_key({u'ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'}), u'ünîcødé_πå®tîtîøñ_√al_宇宙')
         #NOTE: even when we throw escaped unicode in, return unicode
@@ -279,7 +279,7 @@ class StreamTest(TestCase):
 
     def test_escaped_unicode_partition_key(self):
         c = turtle.Turtle()
-        s = stream.Stream(c, 'test_üñîçø∂é_stream', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        s = stream.AWSStream('test_üñîçø∂é_stream', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
         #NOTE: when we create a stream with escaped unicode, convert to unicode it works with unicode data
         assert_equal(s._partition_key({u'ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'}), u'ünîcødé_πå®tîtîøñ_√al_宇宙')
         #NOTE: even when we throw escaped unicode in, return unicode
@@ -383,7 +383,7 @@ class StreamTest(TestCase):
 
         c.put_record = put_record
 
-        s = stream.Stream(c, u'tést_üñîçødé_stream_宇宙', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        s = stream.AWSStream(u'tést_üñîçødé_stream_宇宙', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
 
         test_data = generate_unicode_test_data()
         s.put(**test_data)
@@ -404,7 +404,7 @@ class StreamTest(TestCase):
 
         c.put_record = put_record
 
-        s = stream.Stream(c, 'tést_üñîçødé_stream_宇宙', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
+        s = stream.AWSStream('tést_üñîçødé_stream_宇宙', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
 
         test_data = generate_escaped_unicode_test_data()
         s.put(**test_data)
