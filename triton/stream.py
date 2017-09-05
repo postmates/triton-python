@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 import abc
 import base64
 import time
@@ -281,7 +282,7 @@ class Stream(object):
         return data
 
     def decode(self, record_blob):
-        return msgpack.unpackb(record_blob)
+        return msgpack.unpackb(record_blob, encoding='utf-8')
 
     def __iter__(self):
         return self.build_iterator_from_latest()
@@ -441,8 +442,8 @@ class AWSStream(Stream):
 
     def __init__(self, name, partition_key, conn=None, region='us-east-1'):
         self.conn = conn or connect_to_region(region)
-        self.name = name
-        self.partition_key = partition_key
+        self.name = ascii_to_unicode_str(name)
+        self.partition_key = ascii_to_unicode_str(partition_key)
         self._shard_ids = None
 
         super(AWSStream, self).__init__()
