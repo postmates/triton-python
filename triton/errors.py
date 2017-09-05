@@ -14,6 +14,11 @@ class Error(Exception):
     pass
 
 
+class InvalidConfigurationError(Exception):
+    """Signals a stream config is invalid."""
+    pass
+
+
 class TritonNotConfiguredError(Error):
     """Indicates no config file found"""
     pass

@@ -1,7 +1,10 @@
-from __future__ import unicode_literals
+import abc
 import base64
 import time
 import logging
+import requests
+import uuid
+import itertools
 
 import msgpack
 import boto.kinesis.layer1
@@ -9,7 +12,10 @@ from boto.kinesis.exceptions import ProvisionedThroughputExceededException
 from boto.exception import BotoServerError
 import boto.regioninfo
 
-from triton import errors
+from google.cloud import pubsub
+from google.oauth2 import service_account
+
+from triton import errors, config
 from triton.checkpoint import TritonCheckpointer
 from triton.encoding import msgpack_encode_default, unicode_to_ascii_str, ascii_to_unicode_str
 
@@ -254,12 +260,192 @@ class CombinedStreamIterator(object):
 
 
 class Stream(object):
+    __metaclass__ = abc.ABCMeta
 
-    def __init__(self, conn, name, partition_key):
-        self.conn = conn
-        self.name = ascii_to_unicode_str(name)
-        self.partition_key = ascii_to_unicode_str(partition_key)
+    @abc.abstractmethod
+    def put(self, **record):
+        pass
+
+    @abc.abstractmethod
+    def put_many(self, records):
+        pass
+
+    def encode(self, record):
+        try:
+            data = msgpack.packb(record)
+        except TypeError:
+            # If we fail to serialize our context, we can try again with an
+            # enhanced packer (it's slower though)
+            data = msgpack.packb(record, default=msgpack_encode_default)
+
+        return data
+
+    def decode(self, record_blob):
+        return msgpack.unpackb(record_blob)
+
+    def __iter__(self):
+        return self.build_iterator_from_latest()
+
+    @abc.abstractmethod
+    def build_iterator_from_latest(self, **kwargs):
+        pass
+
+    @abc.abstractmethod
+    def build_iterator_from_checkpoint(self, checkpoint):
+        pass
+
+
+class CompositeStream(Stream):
+
+    class Iterator(object):
+
+        def __init__(self, streams, checkpoints=[]):
+            if checkpoints == []:
+                self.iterators = [stream.build_iterator_from_latest() for stream in streams]
+            else:
+                self.iterators = [stream.build_iterator_from_checkpoint(checkpoint)
+                                    for stream, checkpoint in zip(streams, checkpoints)]
+
+            self.iterator = itertools.izip_longest(*tuple(self.iterators), fillvalue=None)
+
+        def __iter__(self):
+            return self.iterator
+
+    def __init__(self, streams):
+        self.streams = streams
+
+    def put(self, **record):
+        return [stream.put(**record) for stream in self.streams]
+
+    def put_many(self, records):
+        return [stream.put_many(records) for stream in self.streams]
+
+    def build_iterator_from_latest(self):
+        return CompositeStream.Iterator(self.streams)
+
+    def build_iterator_from_checkpoint(self, checkpoints):
+        return CompositeStream.Iterator(self.streams, checkpoints)
+
+
+class GCPStream(Stream):
+
+    # Pubsub limits as defined https://cloud.google.com/pubsub/quotas.
+    BATCH_MAX_MSGS = 1000
+
+    class Iterator(object):
+
+        def __init__(self, stream, subscription_id=None):
+            self.stream = stream
+            self.subscription_id = subscription_id or 'trition-{}'.format(uuid.uuid4().hex)
+            self.subscription = stream.topic.subscription(self.subscription_id)
+            if subscription_id is None:
+                # If the subscription_id is provided, then
+                # it is assumed we are resuming from a previously
+                # active, named subscription.
+                self.subscription.create()
+
+            self.prefetch = []
+            self.prefetch_ack_ids = []
+            self.pending_acks = []
+            self.first_next = True
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            if self.first_next is False:
+                self.pending_acks.append(self.prefetch_ack_ids.pop(0))
+            else:
+                self.first_next = False
+
+            if len(self.prefetch) == 0:
+                if len(self.pending_acks) > 0:
+                    self.subscription.acknowledge(self.pending_acks)
+                    self.pending_acks = []
+
+            pubsub_messages = self.subscription.pull(return_immediately=False)
+            for ack_id, raw_message in pubsub_messages:
+                self.prefetch_ack_ids.append(ack_id)
+                self.prefetch.append(self.stream.decode(raw_message))
+
+            if len(self.prefetch) == 0:
+                raise StopIteration
+
+            return self.prefetch.pop(0)
+
+        next = __next__
+
+    def __init__(self, project, topic, private_key_file):
+        self.http = None
+        self.credentials = None
+
+        # In order to support emulation we either pass
+        # user provided credentials into pubsub.Client or a
+        # simple http client.
+        if private_key_file:
+            self.credentials = service_account.Credentials.from_service_account_file(
+                private_key_file)
+        else:
+            self.http = requests.Session()
+
+        self.client = pubsub.Client(project, credentials=self.credentials, _http=self.http)
+        self.project = project
+        self.topic_name = topic
+        self.topic = self.client.topic(self.topic_name)
+
+        super(GCPStream, self).__init__()
+
+    @staticmethod
+    def retry_policy(e):
+        return True
+
+    def put(self, **record):
+        msg_id = _call_and_retry(
+            self.topic.publish,
+            self.encode(record),
+            retry_on_exception=self.retry_policy)
+
+        return (None, msg_id)
+
+    def put_many(self, records):
+        message_ids = []
+        packed = [self.encode(record) for record in records]
+
+        with self.topic.batch(max_messages=self.BATCH_MAX_MSGS) as topic_batch:
+            for pack in packed:
+                _call_and_retry(
+                    topic_batch.publish,
+                    pack,
+                    retry_on_exception=self.retry_policy
+                )
+
+            _call_and_retry(
+                topic_batch.commit,
+                retry_on_exception=self.retry_policy
+            )
+
+        # topic.batch defines an iterator over message_ids.
+        return [(None, message_id) for message_id in topic_batch]
+
+    def decode(self, pubsub_message):
+        return super(GCPStream, self).decode(pubsub_message.data)
+
+    def build_iterator_from_latest(self):
+        return GCPStream.Iterator(self)
+
+    def build_iterator_from_checkpoint(self, subscription_id):
+        return GCPStream.Iterator(self, subscription_id)
+
+
+class AWSStream(Stream):
+
+    def __init__(self, name, partition_key, conn=None, region='us-east-1'):
+        self.conn = conn or connect_to_region(region)
+        self.name = name
+        self.partition_key = partition_key
         self._shard_ids = None
+
+        super(AWSStream, self).__init__()
 
     def _partition_key(self, data):
         try:
@@ -296,21 +482,21 @@ class Stream(object):
 
         return shard_ids
 
+    @staticmethod
+    def retry_policy(e):
+        return isinstance(e, BotoServerError) and ((e.status / 100 == 5) or type(e) == ProvisionedThroughputExceededException)
+
     def put(self, **kwargs):
         pystatsd.increment(
             STATSD_PUT_ATTEMPT + self.name
         )
 
-        try:
-            data = msgpack.packb(kwargs)
-        except TypeError:
-            # If we fail to serialize our context, we can try again with an
-            # enhanced packer (it's slower though)
-            data = msgpack.packb(kwargs, default=msgpack_encode_default)
+        data = self.encode(kwargs)
         resp = _call_and_retry(
             self.conn.put_record,
             self.name, data,
-            self._partition_key(kwargs)
+            self._partition_key(kwargs),
+            retry_on_exception=self.retry_policy
         )
 
         try:
@@ -323,18 +509,15 @@ class Stream(object):
     def put_many(self, records):
         data_recs = []
         for r in records:
-            try:
-                data = msgpack.packb(r)
-            except TypeError:
-                # If we fail to serialize our context, we can try again with an
-                # enhanced packer (it's slower though)
-                data = msgpack.packb(r, default=msgpack_encode_default)
             data_recs.append({
-                'Data': data,
+                'Data': self.encode(r),
                 'PartitionKey': self._partition_key(r),
             })
 
         return self._put_many_packed(data_recs)
+
+    def decode(self, record_blob):
+        return super(AWSStream, self).decode(base64.b64decode(record_blob))
 
     def _put_many_packed(self, records, retry_count=0, b64_encode=True):
         """Re-usable method for already packed messages,
@@ -372,6 +555,7 @@ class Stream(object):
                 self.conn.put_records,
                 records[max_record:max_record + KINESIS_MAX_LENGTH],
                 self.name,
+                retry_on_exception=self.retry_policy,
                 b64_encode=b64_encode)
 
             for idx, r in enumerate(resp['Records']):
@@ -440,31 +624,41 @@ def get_stream(stream_name, config):
     if not s_config:
         raise errors.StreamNotConfiguredError()
 
-    conn = connect_to_region(s_config.get('region', 'us-east-1'))
+    if isinstance(s_config, list):
+        streams = [get_stream_by_provider(stream_name, entry) for entry in s_config]
+        return CompositeStream(streams)
+    else:
+        return get_stream_by_provider(stream_name, s_config)
 
-    return Stream(conn, s_config['name'], s_config['partition_key'])
+
+def get_stream_by_provider(stream_name, stream_config):
+    stream_config_copy = stream_config.copy()
+    provider = stream_config_copy.pop('provider', config.PROVIDER_AWS)
+
+    if provider == config.PROVIDER_AWS:
+        return AWSStream(**stream_config_copy)
+    else:
+        return GCPStream(**stream_config_copy)
 
 
-def _call_and_retry(kinesis_function, *args, **kwargs):
+def _call_and_retry(function, *args, **kwargs):
     """
     Retry Logic for generic kinesis calls.
 
     This code follows the exponetial backoff pattern suggested by
     http://docs.aws.amazon.com/general/latest/gr/api-retries.html
     """
+    retry_on_exception = kwargs.pop('retry_on_exception', None)
     retries = 0
     while True:
         try:
-            return kinesis_function(*args, **kwargs)
-        except BotoServerError as e:
+            return function(*args, **kwargs)
+        except Exception as e:
             if retries >= KINESIS_MAX_RETRYS:
-                raise e
-            if (
-                    e.status / 100 == 5  # 5xx error
-                    or
-                    type(e) == ProvisionedThroughputExceededException
-            ):
-                time.sleep(2 ** retries * .1)
-                retries += 1
-            else:
-                raise e
+                raise
+
+            if retry_on_exception is not None and not retry_on_exception(e):
+                raise
+
+            time.sleep(2 ** retries * .1)
+            retries += 1
