@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 import abc
 import base64
 import time
@@ -17,7 +18,7 @@ from google.oauth2 import service_account
 
 from triton import errors, config
 from triton.checkpoint import TritonCheckpointer
-from triton.encoding import msgpack_encode_default
+from triton.encoding import msgpack_encode_default, unicode_to_ascii_str, ascii_to_unicode_str
 
 import pystatsd
 
@@ -48,7 +49,7 @@ class Record(object):
 
     @classmethod
     def _decode_record_data(cls, record_data):
-        return msgpack.unpackb(base64.b64decode(record_data))
+        return msgpack.unpackb(base64.b64decode(record_data), encoding='utf-8')
 
     @classmethod
     def from_raw_record(cls, shard_id, raw_record):
@@ -281,7 +282,7 @@ class Stream(object):
         return data
 
     def decode(self, record_blob):
-        return msgpack.unpackb(record_blob)
+        return msgpack.unpackb(record_blob, encoding='utf-8')
 
     def __iter__(self):
         return self.build_iterator_from_latest()
@@ -441,14 +442,29 @@ class AWSStream(Stream):
 
     def __init__(self, name, partition_key, conn=None, region='us-east-1'):
         self.conn = conn or connect_to_region(region)
-        self.name = name
-        self.partition_key = partition_key
+        self.name = ascii_to_unicode_str(name)
+        self.partition_key = ascii_to_unicode_str(partition_key)
         self._shard_ids = None
 
         super(AWSStream, self).__init__()
 
+    #NOTE: explanation of the convoluted try blocks in _partition_key!
+    #when looking up the partition_key in the data, we need to first check
+    #the unicode version of the key, then check the escaped/ascii version.
+    #If the key truly is missing, we want to swallow the second KeyError and
+    #return the first KeyError that points to self.partition_key and not the
+    #copy created by calling unicode_to_ascii_str
     def _partition_key(self, data):
-        return unicode(data[self.partition_key])
+        try:
+            return ascii_to_unicode_str(data[self.partition_key])
+        except KeyError as original_error:
+            #supports a user putting escaped unicode data in, still returns
+            #unicode partition key
+            try:
+                return ascii_to_unicode_str(data[unicode_to_ascii_str(self.partition_key)])
+            except KeyError:
+                pass
+            raise original_error
 
     @property
     def shard_ids(self):

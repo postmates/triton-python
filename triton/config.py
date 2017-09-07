@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 import io
 import yaml
 import logging
@@ -23,14 +24,15 @@ REQUIRED_CONFIG_KEYS_GCP_V2 = ['project', 'topic', 'private_key_file']
 
 _zmq_config = None
 
-
 def _validate_config(stream_name, config, required):
     for k in required:
         if k not in config:
             raise errors.InvalidConfigurationError(
                 "Missing {} : {}".format(stream_name, k))
-
-
+       
+#NOTE: when loading config dictionary, yaml automatically converts unicode
+#in the yaml file to unicode in the dictionary. Dictionary will still contain
+#ascii keys and values for ascii strings in the yaml file
 def load_config(file_name):
     try:
         config_dict = yaml.load(io.open(file_name))

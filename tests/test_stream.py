@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from testify import *
 import mock
 import base64
@@ -10,6 +12,7 @@ import msgpack
 
 from triton import stream
 from triton import errors
+from triton.encoding import ascii_to_unicode_str
 from boto.exception import BotoServerError
 
 
@@ -20,10 +23,28 @@ def generate_raw_record(n=1):
 
     return raw_record
 
+def generate_unicode_raw_record(n=42):
+    data = base64.b64encode(msgpack.packb({u'value': True, u'test_üñîçø∂é_ké¥_宇宙': u'test_üñîçø∂é_√ål_宇宙'}))
+
+    raw_record = {u'SequenceNumber': n, u'Data': data}
+
+    return raw_record
+
+def generate_escaped_unicode_raw_record(n=42):
+    data = base64.b64encode(msgpack.packb({'value': True, 'test_üñîçø∂é_ké¥_宇宙': 'test_üñîçø∂é_√ål_宇宙'}))
+
+    raw_record = {'SequenceNumber': n, 'Data': data}
+
+    return raw_record
 
 def generate_record(n=1):
     return stream.Record.from_raw_record(0, generate_raw_record(n))
 
+def generate_unicode_record(n=1):
+    return stream.Record.from_raw_record(0, generate_unicode_raw_record(n))
+
+def generate_escaped_unicode_record(n=1):
+    return stream.Record.from_raw_record(0, generate_escaped_unicode_raw_record(n))
 
 def generate_messy_test_data(primary_key='my_key'):
     data = {
@@ -36,6 +57,25 @@ def generate_messy_test_data(primary_key='my_key'):
     }
     return data
 
+def generate_unicode_test_data(primary_key=u'my_key'):
+    data = {
+        u'pkey': primary_key,
+        u'value': True,
+        u'ascii_key': u'sømé_ünîcode_vàl',
+        u'ünîcødé_key': u'ascii_val',
+        u'ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'
+    }
+    return data
+
+def generate_escaped_unicode_test_data(primary_key='my_key'):
+    data = {
+        'pkey': primary_key,
+        'value': True,
+        'ascii_key': 'sømé_ünîcode_vàl',
+        'ünîcødé_key': 'ascii_val',
+        'ünîcødé_πå®tîtîøñ_ke¥_宇宙': 'ünîcødé_πå®tîtîøñ_√al_宇宙'
+    }
+    return data
 
 class Point(object):
 
@@ -53,6 +93,24 @@ class RecordTest(TestCase):
         assert_equal(r.shard_id, 0)
         assert_equal(r.data['value'], True)
 
+    def test_from_unicode_raw_record(self):
+        unicode_raw_record = generate_unicode_raw_record()
+
+        ur = stream.Record.from_raw_record(3, unicode_raw_record)
+        assert_equal(ur.seq_num, 42)
+        assert_equal(ur.shard_id, 3)
+        assert_equal(ur.data[u'value'], True)
+        assert_equal(ur.data[u'test_üñîçø∂é_ké¥_宇宙'], u'test_üñîçø∂é_√ål_宇宙')
+
+    def test_from_escaped_unicode_raw_record(self):
+        esc_unicode_raw_record = generate_escaped_unicode_raw_record()
+
+        eur = stream.Record.from_raw_record(3, esc_unicode_raw_record)
+        assert_equal(eur.seq_num, 42)
+        assert_equal(eur.shard_id, 3)
+        assert_equal(eur.data['value'], True)
+        #NOTE: escaped unicode comes out the other side as unicode
+        assert_equal(eur.data[u'test_üñîçø∂é_ké¥_宇宙'], u'test_üñîçø∂é_√ål_宇宙')
 
 class StreamIteratorTest(TestCase):
 
@@ -211,6 +269,56 @@ class StreamTest(TestCase):
 
         assert_equal(s._partition_key({'value': 1}), "1")
 
+    def test_ascii_partition_key(self):
+        c = turtle.Turtle()
+        s = stream.AWSStream('test stream', 'value', conn=c)
+
+        assert_equal(s._partition_key({'value': 'ascii_string'}), 'ascii_string')
+
+    def test_unicode_partition_key(self):
+        c = turtle.Turtle()
+        s = stream.AWSStream(u'test_üñîçø∂é_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+
+        assert_equal(s._partition_key({u'ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'}), u'ünîcødé_πå®tîtîøñ_√al_宇宙')
+        #NOTE: even when we throw escaped unicode in, return unicode
+        assert_equal(s._partition_key({'ünîcødé_πå®tîtîøñ_ke¥_宇宙': 'ünîcødé_πå®tîtîøñ_√al_宇宙'}), u'ünîcødé_πå®tîtîøñ_√al_宇宙')
+
+    def test_escaped_unicode_partition_key(self):
+        c = turtle.Turtle()
+        s = stream.AWSStream('test_üñîçø∂é_stream', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+        #NOTE: when we create a stream with escaped unicode, convert to unicode
+        assert_equal(s._partition_key({u'ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'}), u'ünîcødé_πå®tîtîøñ_√al_宇宙')
+        #NOTE: even when we throw escaped unicode in, return unicode
+        assert_equal(s._partition_key({'ünîcødé_πå®tîtîøñ_ke¥_宇宙': 'ünîcødé_πå®tîtîøñ_√al_宇宙'}), u'ünîcødé_πå®tîtîøñ_√al_宇宙')
+
+    def test_missing_ascii_partition_key(self):
+        c = turtle.Turtle()
+        s = stream.AWSStream('test stream', 'value', conn=c)
+
+        with assert_raises_such_that(KeyError, lambda ke: assert_equal(ke.args[0], 'value')):
+            s._partition_key({'wrong_value': 'ascii_string'})
+
+    def test_missing_unicode_partition_key(self):
+        c = turtle.Turtle()
+        s = stream.AWSStream(u'test_üñîçø∂é_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+
+        #NOTE: We should test that, when partition key is missing from data, we return
+        #a KeyError with the same unicode parition_key object that is a member of the Stream object
+        with assert_raises_such_that(KeyError, lambda ke: assert_equal(ke.args[0], u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')):
+            s._partition_key({u'wrong_ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'})
+        with assert_raises_such_that(KeyError, lambda ke: assert_equal(ke.args[0], u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')):
+            s._partition_key({'wrong_ünîcødé_πå®tîtîøñ_ke¥_宇宙': 'ünîcødé_πå®tîtîøñ_√al_宇宙'})
+
+    def test_missing_escaped_unicode_partition_key(self):
+        c = turtle.Turtle()
+        s = stream.AWSStream('test_üñîçø∂é_stream', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+        #NOTE: We should test that, when partition key is missing from data, we return
+        #a KeyError with the same unicode parition_key object that is a member of the Stream object
+        with assert_raises_such_that(KeyError, lambda ke: assert_equal(ke.args[0], u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')):
+            s._partition_key({u'wrong_ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'})
+        with assert_raises_such_that(KeyError, lambda ke: assert_equal(ke.args[0], u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')):
+            s._partition_key({'wrong_ünîcødé_πå®tîtîøñ_ke¥_宇宙': 'ünîcødé_πå®tîtîøñ_√al_宇宙'})
+
     def test_shards_ids(self):
         c = turtle.Turtle()
 
@@ -297,6 +405,49 @@ class StreamTest(TestCase):
         assert_equal(
             sent_data['point'],
             str(test_data['point'].coords))
+
+    def test_put_unicode_data(self):
+        c = turtle.Turtle()
+
+        mock_sent_message_data = list()
+
+        def put_record(*args):
+            mock_sent_message_data.append(args[1])
+            return {u'ShardId': u'0001', u'SequenceNumber': 1}
+
+        c.put_record = put_record
+
+        s = stream.AWSStream(u'tést_üñîçødé_stream_宇宙', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+
+        test_data = generate_unicode_test_data()
+        s.put(**test_data)
+
+        sent_data = msgpack.unpackb(mock_sent_message_data[0], encoding='utf-8')
+
+        assert_equal(sent_data[u'pkey'], test_data[u'pkey'])
+        assert_equal(sent_data[u'ünîcødé_πå®tîtîøñ_ke¥_宇宙'], test_data[u'ünîcødé_πå®tîtîøñ_ke¥_宇宙'])
+
+    def test_put_escaped_unicode_data(self):
+        c = turtle.Turtle()
+
+        mock_sent_message_data = list()
+
+        def put_record(*args):
+            mock_sent_message_data.append(args[1])
+            return {'ShardId': u'0001', 'SequenceNumber': 1}
+
+        c.put_record = put_record
+
+        s = stream.AWSStream('tést_üñîçødé_stream_宇宙', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+
+        test_data = generate_escaped_unicode_test_data()
+        s.put(**test_data)
+
+        sent_data = msgpack.unpackb(mock_sent_message_data[0], encoding='utf-8')
+
+        assert_equal(sent_data['pkey'], test_data['pkey'])
+        #NOTE that escaped ascii data comes out as unicode, courtesy of the encoding='utf-8' to msgpack.unpackb
+        assert_equal(sent_data[u'ünîcødé_πå®tîtîøñ_ke¥_宇宙'], ascii_to_unicode_str(test_data['ünîcødé_πå®tîtîøñ_ke¥_宇宙']))
 
     def test_put_fail(self):
         c = turtle.Turtle()

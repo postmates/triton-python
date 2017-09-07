@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 import decimal
 import datetime
 
@@ -10,7 +11,7 @@ def msgpack_encode_default(obj):
     if isinstance(obj, decimal.Decimal):
         return str(obj)
     if isinstance(obj, datetime.datetime):
-        return obj.isoformat(' ')
+        return obj.isoformat(str(' '))
     if isinstance(obj, datetime.date):
         return obj.strftime("%Y-%m-%d")
     if hasattr(obj, 'coords'):
