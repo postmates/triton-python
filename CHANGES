@@ -1,3 +1,7 @@
+triton (0.0.15)
+
+  * Triton supports unicode!
+
 triton (0.0.14)
 
   * Additional statsd monitoring in stream class
