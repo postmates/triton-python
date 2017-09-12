@@ -1,3 +1,7 @@
+triton (0.0.16)
+
+  * Removing pubsub support temporarily
+
 triton (0.0.15)
 
   * Triton supports unicode!
