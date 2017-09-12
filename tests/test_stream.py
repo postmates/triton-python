@@ -271,13 +271,13 @@ class StreamTest(TestCase):
 
     def test_ascii_partition_key(self):
         c = turtle.Turtle()
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream('test stream', 'value', conn=c)
 
         assert_equal(s._partition_key({'value': 'ascii_string'}), 'ascii_string')
 
     def test_unicode_partition_key(self):
         c = turtle.Turtle()
-        s = stream.AWSStream(u'test_üñîçø∂é_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+        s = stream.Stream(u'test_üñîçø∂é_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
 
         assert_equal(s._partition_key({u'ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'}), u'ünîcødé_πå®tîtîøñ_√al_宇宙')
         #NOTE: even when we throw escaped unicode in, return unicode
@@ -285,7 +285,7 @@ class StreamTest(TestCase):
 
     def test_escaped_unicode_partition_key(self):
         c = turtle.Turtle()
-        s = stream.AWSStream('test_üñîçø∂é_stream', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+        s = stream.Stream('test_üñîçø∂é_stream', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
         #NOTE: when we create a stream with escaped unicode, convert to unicode
         assert_equal(s._partition_key({u'ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'}), u'ünîcødé_πå®tîtîøñ_√al_宇宙')
         #NOTE: even when we throw escaped unicode in, return unicode
@@ -293,14 +293,14 @@ class StreamTest(TestCase):
 
     def test_missing_ascii_partition_key(self):
         c = turtle.Turtle()
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream('test stream', 'value', conn=c)
 
         with assert_raises_such_that(KeyError, lambda ke: assert_equal(ke.args[0], 'value')):
             s._partition_key({'wrong_value': 'ascii_string'})
 
     def test_missing_unicode_partition_key(self):
         c = turtle.Turtle()
-        s = stream.AWSStream(u'test_üñîçø∂é_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+        s = stream.Stream(u'test_üñîçø∂é_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
 
         #NOTE: We should test that, when partition key is missing from data, we return
         #a KeyError with the same unicode parition_key object that is a member of the Stream object
@@ -311,7 +311,7 @@ class StreamTest(TestCase):
 
     def test_missing_escaped_unicode_partition_key(self):
         c = turtle.Turtle()
-        s = stream.AWSStream('test_üñîçø∂é_stream', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+        s = stream.Stream('test_üñîçø∂é_stream', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
         #NOTE: We should test that, when partition key is missing from data, we return
         #a KeyError with the same unicode parition_key object that is a member of the Stream object
         with assert_raises_such_that(KeyError, lambda ke: assert_equal(ke.args[0], u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')):
@@ -417,7 +417,7 @@ class StreamTest(TestCase):
 
         c.put_record = put_record
 
-        s = stream.AWSStream(u'tést_üñîçødé_stream_宇宙', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+        s = stream.Stream(u'tést_üñîçødé_stream_宇宙', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
 
         test_data = generate_unicode_test_data()
         s.put(**test_data)
@@ -438,7 +438,7 @@ class StreamTest(TestCase):
 
         c.put_record = put_record
 
-        s = stream.AWSStream('tést_üñîçødé_stream_宇宙', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+        s = stream.Stream('tést_üñîçødé_stream_宇宙', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
 
         test_data = generate_escaped_unicode_test_data()
         s.put(**test_data)
