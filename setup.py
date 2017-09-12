@@ -27,6 +27,6 @@ setup(
     author_email=get_init_val('author_email'),
     url=get_init_val('url'),
     scripts=glob.glob("bin/triton*"),
-    install_requires=['python-snappy', 'msgpack_python', 'pyzmq', 'future', 'google-cloud-pubsub'],
+    install_requires=['python-snappy', 'msgpack_python', 'pyzmq', 'future'],
     packages=PACKAGES
 )

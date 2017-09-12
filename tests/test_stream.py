@@ -265,19 +265,19 @@ class StreamTest(TestCase):
 
     def test_partition_key(self):
         c = turtle.Turtle()
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
 
         assert_equal(s._partition_key({'value': 1}), "1")
 
     def test_ascii_partition_key(self):
         c = turtle.Turtle()
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
 
         assert_equal(s._partition_key({'value': 'ascii_string'}), 'ascii_string')
 
     def test_unicode_partition_key(self):
         c = turtle.Turtle()
-        s = stream.AWSStream(u'test_üñîçø∂é_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+        s = stream.Stream(c, u'test_üñîçø∂é_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
 
         assert_equal(s._partition_key({u'ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'}), u'ünîcødé_πå®tîtîøñ_√al_宇宙')
         #NOTE: even when we throw escaped unicode in, return unicode
@@ -285,7 +285,7 @@ class StreamTest(TestCase):
 
     def test_escaped_unicode_partition_key(self):
         c = turtle.Turtle()
-        s = stream.AWSStream('test_üñîçø∂é_stream', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+        s = stream.Stream(c, 'test_üñîçø∂é_stream', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
         #NOTE: when we create a stream with escaped unicode, convert to unicode
         assert_equal(s._partition_key({u'ünîcødé_πå®tîtîøñ_ke¥_宇宙': u'ünîcødé_πå®tîtîøñ_√al_宇宙'}), u'ünîcødé_πå®tîtîøñ_√al_宇宙')
         #NOTE: even when we throw escaped unicode in, return unicode
@@ -293,14 +293,14 @@ class StreamTest(TestCase):
 
     def test_missing_ascii_partition_key(self):
         c = turtle.Turtle()
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
 
         with assert_raises_such_that(KeyError, lambda ke: assert_equal(ke.args[0], 'value')):
             s._partition_key({'wrong_value': 'ascii_string'})
 
     def test_missing_unicode_partition_key(self):
         c = turtle.Turtle()
-        s = stream.AWSStream(u'test_üñîçø∂é_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+        s = stream.Stream(c, u'test_üñîçø∂é_stream', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
 
         #NOTE: We should test that, when partition key is missing from data, we return
         #a KeyError with the same unicode parition_key object that is a member of the Stream object
@@ -311,7 +311,7 @@ class StreamTest(TestCase):
 
     def test_missing_escaped_unicode_partition_key(self):
         c = turtle.Turtle()
-        s = stream.AWSStream('test_üñîçø∂é_stream', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+        s = stream.Stream(c, 'test_üñîçø∂é_stream', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
         #NOTE: We should test that, when partition key is missing from data, we return
         #a KeyError with the same unicode parition_key object that is a member of the Stream object
         with assert_raises_such_that(KeyError, lambda ke: assert_equal(ke.args[0], u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')):
@@ -333,13 +333,13 @@ class StreamTest(TestCase):
             }
 
         c.describe_stream = describe_stream
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
 
         assert_equal(set(s.shard_ids), set(['0001', '0002']))
 
     def test_select_shard_ids(self):
         c = turtle.Turtle()
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
         s._shard_ids = ['0001', '0002', '0003']
 
         shard_ids = s._select_shard_ids([0, 2])
@@ -347,7 +347,7 @@ class StreamTest(TestCase):
 
     def test_select_shard_ids_empty(self):
         c = turtle.Turtle()
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
         s._shard_ids = ['0001', '0002', '0003']
 
         shard_ids = s._select_shard_ids([])
@@ -355,7 +355,7 @@ class StreamTest(TestCase):
 
     def test_select_shard_ids_missing(self):
         c = turtle.Turtle()
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
         s._shard_ids = ['0001', '0002', '0003']
 
         with assert_raises(errors.ShardNotFoundError):
@@ -369,7 +369,7 @@ class StreamTest(TestCase):
 
         c.put_record = put_record
 
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
 
         with mock.patch('pystatsd.increment') as increment:
             shard_id, seq_num = s.put(value=0)
@@ -388,7 +388,7 @@ class StreamTest(TestCase):
 
         c.put_record = put_record
 
-        s = stream.AWSStream('test_stream', 'pkey', conn=c)
+        s = stream.Stream(c, 'test_stream', 'pkey')
 
         test_data = generate_messy_test_data()
         s.put(**test_data)
@@ -417,7 +417,7 @@ class StreamTest(TestCase):
 
         c.put_record = put_record
 
-        s = stream.AWSStream(u'tést_üñîçødé_stream_宇宙', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+        s = stream.Stream(c, u'tést_üñîçødé_stream_宇宙', u'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
 
         test_data = generate_unicode_test_data()
         s.put(**test_data)
@@ -438,7 +438,7 @@ class StreamTest(TestCase):
 
         c.put_record = put_record
 
-        s = stream.AWSStream('tést_üñîçødé_stream_宇宙', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙', conn=c)
+        s = stream.Stream(c, 'tést_üñîçødé_stream_宇宙', 'ünîcødé_πå®tîtîøñ_ke¥_宇宙')
 
         test_data = generate_escaped_unicode_test_data()
         s.put(**test_data)
@@ -457,7 +457,7 @@ class StreamTest(TestCase):
 
         c.put_record = put_record
 
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
 
         assert_raises(errors.KinesisError, s.put, value=0)
 
@@ -469,7 +469,7 @@ class StreamTest(TestCase):
 
         c.put_records = put_records
 
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
 
         with mock.patch('pystatsd.increment') as increment:
             resp = s.put_many([dict(value=0)])
@@ -493,7 +493,7 @@ class StreamTest(TestCase):
 
         c.put_records = put_records
 
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
 
         test_data = generate_messy_test_data()
 
@@ -524,7 +524,7 @@ class StreamTest(TestCase):
 
         c.put_records = put_records
 
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
 
         for test_count in [1, 499, 500, 501, 1201]:
             resp = s.put_many([dict(value=0)] * test_count)
@@ -533,7 +533,7 @@ class StreamTest(TestCase):
     def test_build_iterator(self):
         c = turtle.Turtle()
 
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
         shard_ids = ['0001', '0002']
 
         i = s._build_iterator(stream.ITER_TYPE_LATEST, shard_ids, None)
@@ -560,7 +560,7 @@ class StreamTest(TestCase):
 
         c.put_record = put_record
 
-        st = stream.AWSStream('test stream', 'value', conn=c)
+        st = stream.Stream(c, 'test stream', 'value')
 
         shard_id, seq_num = st.put(value=0)
         assert_equal(seq_num, 1)
@@ -603,14 +603,14 @@ class StreamTest(TestCase):
 
         put_records = PutRecords()
         c.put_records = put_records
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
         test_count = 600
         resp = s.put_many([dict(value=0)] * test_count)
         assert_equal(len(resp), test_count)
 
         put_records = PutRecords(fail_for_n_calls=4, initial_error_rate=1.)
         c.put_records = put_records
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
         test_count = 100
         assert_raises(
             errors.KinesisPutManyError, s.put_many,
@@ -618,7 +618,7 @@ class StreamTest(TestCase):
 
         put_records = PutRecords(fail_for_n_calls=4, initial_error_rate=.5)
         c.put_records = put_records
-        s = stream.AWSStream('test stream', 'value', conn=c)
+        s = stream.Stream(c, 'test stream', 'value')
         test_count = 100
         try:
             resp = s.put_many([dict(value=0)] * test_count)
