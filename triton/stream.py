@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 from __future__ import unicode_literals
-import abc
-=======
->>>>>>> parent of cc123c1... Introducing Stream Interface + Pubsub Support (#22)
 import base64
 import time
 import logging
