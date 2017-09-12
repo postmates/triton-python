@@ -242,7 +242,7 @@ class StreamIteratorCheckpointTest(TestCase):
         with mock.patch(pool_patch, new=lambda: self.pool):
             with mock.patch(chkpt_patch, new=TritonCheckpointerTest):
                 c = turtle.Turtle()
-                s = stream.AWSStream(stream_name, 'p_key', conn=c)
+                s = stream.Stream(c, stream_name, 'p_key')
                 s._shard_ids = [shard_id, ]
 
                 s.conn.get_records = get_batches_of_10_records
