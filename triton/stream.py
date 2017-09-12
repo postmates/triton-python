@@ -257,10 +257,16 @@ class Stream(object):
 
     def __init__(self, conn, name, partition_key):
         self.conn = conn
-        self.name = name
-        self.partition_key = partition_key
+        self.name = ascii_to_unicode_str(name)
+        self.partition_key = ascii_to_unicode_str(partition_key)
         self._shard_ids = None
 
+    #NOTE: explanation of the convoluted try blocks in _partition_key!
+    #when looking up the partition_key in the data, we need to first check
+    #the unicode version of the key, then check the escaped/ascii version.
+    #If the key truly is missing, we want to swallow the second KeyError and
+    #return the first KeyError that points to self.partition_key and not the
+    #copy created by calling unicode_to_ascii_str
     def _partition_key(self, data):
         try:
             return ascii_to_unicode_str(data[self.partition_key])
