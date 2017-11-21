@@ -110,7 +110,6 @@ class NonblockingStream(object):
 
         if _zmq_context and threadLocal.zmq_socket is not None:
             try:
-                log.debug("Sending msg")
                 threadLocal.zmq_socket.send_multipart(
                     (meta_data, message_data), zmq.NOBLOCK)
             except zmq.ZMQError:
