@@ -7,7 +7,7 @@ triton
 """
 
 __title__ = 'triton'
-__version__ = '0.0.16'
+__version__ = '0.0.17'
 __description__ = 'Triton - Kinesis Data Pipeline'
 __url__ = 'https://github.com/postmates/triton-python'
 __build__ = 0
@@ -20,3 +20,4 @@ from .config import load_config
 from .stream import get_stream
 from .nonblocking_stream import get_nonblocking_stream
 from .store import stream_from_s3_store
+from .encoding import
