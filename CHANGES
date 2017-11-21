@@ -1,6 +1,7 @@
-triton (0.0.17)
+triton (0.0.18)
 
   * Remove debug logs for nonblocking stream
+  * (had to skip 0.0.17 because of mistake in github version tagging)
 
 triton (0.0.16)
 
