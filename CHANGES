@@ -1,3 +1,7 @@
+triton (0.0.19)
+
+  * Add boto to setup.py's install_requires
+
 triton (0.0.18)
 
   * Remove debug logs for nonblocking stream
