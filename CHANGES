@@ -1,3 +1,7 @@
+triton (0.0.19)
+
+  * Fix case where setting TRITON_ZMQ_PORT wasn't working
+
 triton (0.0.18)
 
   * Remove debug logs for nonblocking stream
