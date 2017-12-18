@@ -40,7 +40,8 @@ def get_zmq_config():
     global _zmq_config
     if not _zmq_config:
         zmq_host = os.environ.get(ENV_VAR_TRITON_ZMQ_HOST, ZMQ_DEFAULT_HOST)
-        zmq_port = os.environ.get(ENV_VAR_TRITON_ZMQ_PORT, ZMQ_DEFAULT_PORT)
+        zmq_port = int(os.environ.get(ENV_VAR_TRITON_ZMQ_PORT,
+                                      ZMQ_DEFAULT_PORT))
         _zmq_config = (zmq_host, zmq_port)
 
     return _zmq_config
