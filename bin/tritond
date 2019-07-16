@@ -142,6 +142,10 @@ def _write_messages_to_streams(waiting_messages):
                     'list_of_messages': list_of_messages
                 }
             )
+            pystatsd.increment(
+                STATSD_EVENTCOUNT + stream_name + "_error",
+                len(list_of_messages),
+            )
         pystatsd.increment(
             STATSD_EVENTCOUNT + stream_name,
             len(list_of_messages)
