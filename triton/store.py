@@ -11,7 +11,7 @@ import msgpack
 import snappy
 import boto.s3
 from boto.s3.connection import OrdinaryCallingFormat
-from encoding import ascii_to_unicode_str, unicode_to_ascii_str
+from triton.encoding import ascii_to_unicode_str, unicode_to_ascii_str
 
 MAX_BUFFER_SIZE = 1024 * 1024
 
