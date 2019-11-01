@@ -23,7 +23,7 @@ def msgpack_encode_default(obj):
 
 
 def unicode_to_ascii_str(text):
-    return bytes(text)
+    return bytes(text, encoding='utf8')
 
 
 def ascii_to_unicode_str(text):
