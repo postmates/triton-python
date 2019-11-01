@@ -1,4 +1,3 @@
-from __future__ import unicode_literals
 import decimal
 import datetime
 
@@ -24,7 +23,7 @@ def msgpack_encode_default(obj):
 
 
 def unicode_to_ascii_str(text):
-    return str(text)
+    return bytes(text)
 
 
 def ascii_to_unicode_str(text):

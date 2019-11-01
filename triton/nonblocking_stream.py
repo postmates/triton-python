@@ -10,7 +10,6 @@ It does this by sending the messageover ZeroMQ to tritond.
 Adapted from https://github.com/rhettg/BlueOx/blob/master/blueox/network.py
 
 """
-from __future__ import unicode_literals
 import logging
 import threading
 import struct

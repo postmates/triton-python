@@ -282,7 +282,7 @@ def main():
         except (KeyboardInterrupt, SystemExit):
             continue_running[0] = False
             break
-        except zmq.ZMQError, e:
+        except zmq.ZMQError as e:
             if e.errno == errno.EINTR:
                 # If this is from a SIGTERM, we have a handler for that and the
                 # loop should exit gracefull.
@@ -295,7 +295,7 @@ def main():
         if collector_sock in ready:
             try:
                 event_meta, event_data = collector_sock.recv_multipart()
-            except ValueError, e:
+            except ValueError as e:
                 # Sometimes clients can fail and corrupt these two-part sends.
                 log.warning("Failed to recv from %r: %r", collector_sock, e)
                 continue
