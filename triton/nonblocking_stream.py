@@ -19,9 +19,9 @@ import atexit
 import zmq
 import msgpack
 
-from triton import errors
-from triton import config
-from triton.encoding import msgpack_encode_default, unicode_to_ascii_str, ascii_to_unicode_str
+from . import errors
+from . import config
+from .encoding import msgpack_encode_default, unicode_to_ascii_str, ascii_to_unicode_str
 
 log = logging.getLogger(__name__)
 
