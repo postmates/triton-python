@@ -13,8 +13,6 @@ from triton import errors
 from triton.checkpoint import TritonCheckpointer
 from triton.encoding import msgpack_encode_default, unicode_to_ascii_str, ascii_to_unicode_str
 
-import pystatsd
-
 MIN_POLL_INTERVAL_SECS = 1.0
 KINESIS_MAX_LENGTH = 500  # Can't write more than 500 records at a time
 KINESIS_MAX_RETRYS = 2  # Kinesis 'InternalFailure' retry attempts
@@ -25,11 +23,6 @@ ITER_TYPE_FROM_SEQNUM = 'AFTER_SEQUENCE_NUMBER'
 ITER_TYPE_FROM_CHECKPOINT = 'FROM_CHECKPOINT'
 
 log = logging.getLogger(__name__)
-
-# See https://github.com/postmates/pystatsd for statsd configuration
-# Note that pystatsd writes raise no exception if no statsd server is running
-STATSD_PREFIX = 'triton.stream.'
-STATSD_PUT_ATTEMPT = STATSD_PREFIX + "put_attempt."
 
 
 class Record(object):
@@ -307,10 +300,6 @@ class Stream(object):
         return shard_ids
 
     def put(self, **kwargs):
-        pystatsd.increment(
-            STATSD_PUT_ATTEMPT + self.name
-        )
-
         try:
             data = msgpack.packb(kwargs)
         except TypeError:
@@ -365,11 +354,6 @@ class Stream(object):
         num_records = len(records)
         max_record = 0
         retry_records = []
-
-        pystatsd.increment(
-            STATSD_PUT_ATTEMPT + self.name,
-            num_records
-        )
 
         while max_record < num_records:
             # iterate through all the records MAX_LENTH records at a time
