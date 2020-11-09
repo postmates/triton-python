@@ -27,7 +27,7 @@ def load_config(file_name):
         log.error("Failed to open %s: %r", file_name, e)
         return None
 
-    for stream_name, v in config_dict.iteritems():
+    for stream_name, v in config_dict.items():
         for k in REQUIRED_CONFIG_KEYS:
             if k not in v:
                 raise errors.InvalidConfigurationError(
