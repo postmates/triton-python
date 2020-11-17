@@ -81,7 +81,7 @@ class NonblockingStream(object):
         # use for routing and stats. This is much faster than having the
         # collector decode the whole event. We're just going to use python
         # struct module to make a quick and dirty data structure
-        if len(self._partition_key(data)) > 64:
+        if self._partition_key(data) and len(self._partition_key(data)) > 64:
             raise ValueError("Partition Key Too Long")
 
         meta_data = struct.pack(META_STRUCT_FMT, META_STRUCT_VERSION,
