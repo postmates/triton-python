@@ -23,6 +23,7 @@ def msgpack_encode_default(obj):
     except Exception:
         raise TypeError("Unknown type: %r" % (obj,))
 
+
 def unicode_to_ascii_str(text):
     #if unicode, escape out multibyte characters
     if isinstance(text, six.text_type):
@@ -30,7 +31,8 @@ def unicode_to_ascii_str(text):
     else:
         #need to str here because this function could be fed something
         #that's not unicode but needs to be an ascii string (e.g. an int)
-        return str(text)
+        return six.b(text)
+
 
 def ascii_to_unicode_str(text):
     #if ascii/escaped unicode, decode to utf-8
