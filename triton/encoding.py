@@ -25,6 +25,9 @@ def msgpack_encode_default(obj):
 
 
 def unicode_to_ascii_str(text):
+    if text is None:
+        return b''
+
     #if unicode, escape out multibyte characters
     if isinstance(text, six.text_type):
         return text.encode('utf-8')
