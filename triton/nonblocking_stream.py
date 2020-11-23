@@ -73,6 +73,8 @@ class NonblockingStream(object):
             init(*config.get_zmq_config())
 
     def _partition_key(self, data):
+        if data[self.partition_key] is None:
+            raise ValueError('data[self.partition_key] is None')
         return ascii_to_unicode_str(data[self.partition_key])
 
     def _serialize_context(self, data):
