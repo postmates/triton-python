@@ -39,4 +39,6 @@ def ascii_to_unicode_str(text):
         return text.decode('utf-8')
     # need to unicode here because this function could be fed something
     # that's not an ascii str but needs to be a unicode string (e.g. an int)
+    if six.PY2:
+        return six.u(text)
     return str(text)
