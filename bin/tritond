@@ -45,6 +45,7 @@ POLL_LOOP_TIMEOUT_MS = 100
 # Note that pystatsd writes raise no exception if no statsd server is running
 STATSD_PREFIX = 'tritond.'
 STATSD_EVENTCOUNT = STATSD_PREFIX + "eventcount."
+STATSD_SKIPCOUNT = STATSD_PREFIX + "skipcount."
 STATSD_LOOPTIME = STATSD_PREFIX + "write_loop.timing"
 
 log = logging.getLogger("triton.d")
@@ -54,6 +55,11 @@ _streams = dict()
 
 # version byte in our meta struct for JSON meta.
 META_STRUCT_VERSION_JSON = 0x7B
+
+# We are in the process of deprecating triton/kinesis and would like to
+# interrupt the publishing of all events not sent to a stream that is
+# still being read by a consumer.
+STREAM_WHITELIST = set(['delivery_event', 'courier_event'])
 
 
 def setup_logging(options):
@@ -308,10 +314,17 @@ def main():
                 log.warning("Failed to decode event due to version mismatch")
                 continue
 
-            waiting_messages[stream_name].append({
-                'Data': event_data,
-                'PartitionKey': partition_key
-            })
+            # As stated above, triton/kinesis are being deprecated and we only
+            # want to publish to streams that are being read by a consumer.
+            if any([
+                    stream_name.startswith(stream_prefix)
+                    for stream_prefix in STREAM_WHITELIST]):
+                waiting_messages[stream_name].append({
+                    'Data': event_data,
+                    'PartitionKey': partition_key
+                })
+            else:
+                pystatsd.increment(STATSD_SKIPCOUNT + stream_name)
 
         last_write, waiting_messages = _maybe_flush_events(waiting_messages, last_write, output_file)
 
