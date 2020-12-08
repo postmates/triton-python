@@ -57,9 +57,19 @@ _streams = dict()
 META_STRUCT_VERSION_JSON = 0x7B
 
 # We are in the process of deprecating triton/kinesis and would like to
-# interrupt the publishing of all events not sent to a stream that is
-# still being read by a consumer.
-STREAM_WHITELIST = set(['delivery_event', 'courier_event'])
+# interrupt the publishing of all events sent to a stream where there
+# are no reads from any downstream consumers.
+STREAM_BLACKLIST = set([
+    'job_event',
+    'courier_event ',
+    'courier_device_event',
+    'god_event',
+    'place_event',
+    'merchant_event',
+    'promo_event',
+    'workbench_queue_size',
+    'invoice_event',
+])
 
 
 def setup_logging(options):
@@ -318,13 +328,13 @@ def main():
             # want to publish to streams that are being read by a consumer.
             if any([
                     stream_name.startswith(stream_prefix)
-                    for stream_prefix in STREAM_WHITELIST]):
+                    for stream_prefix in STREAM_BLACKLIST]):
+                pystatsd.increment(STATSD_SKIPCOUNT + stream_name)
+            else:
                 waiting_messages[stream_name].append({
                     'Data': event_data,
                     'PartitionKey': partition_key
                 })
-            else:
-                pystatsd.increment(STATSD_SKIPCOUNT + stream_name)
 
         last_write, waiting_messages = _maybe_flush_events(waiting_messages, last_write, output_file)
 
