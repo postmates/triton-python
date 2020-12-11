@@ -61,7 +61,7 @@ META_STRUCT_VERSION_JSON = 0x7B
 # are no reads from any downstream consumers.
 STREAM_BLACKLIST = set([
     'job_event',
-    'courier_event ',
+    'courier_event',
     'courier_device_event',
     'god_event',
     'place_event',
