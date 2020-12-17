@@ -151,11 +151,16 @@ def _write_messages_to_streams(waiting_messages):
             stream._put_many_packed(list_of_messages)
         except:
             log.exception(
-                "Tritond failed to write messages to stream",
+                "Tritond failed to write messages to stream [%s]",
+                stream_name,
                 extra={
                     'stream_name': stream_name,
                     'list_of_messages': list_of_messages
                 }
+            )
+            pystatsd.increment(
+                STATSD_EVENTCOUNT + stream_name + "_error",
+                len(list_of_messages),
             )
         pystatsd.increment(
             STATSD_EVENTCOUNT + stream_name,
