@@ -418,6 +418,28 @@ class Stream(object):
         return CombinedStreamIterator(all_iters)
 
 
+class TestStream(Stream):
+
+    def __init__(self, name, partition_key):
+        self.conn = {
+            'put_record': TestStream.put_record,
+            'put_records': TestStream.put_records
+        }
+        self.name = name
+        self.partition_key = partition_key
+        self._shard_ids = None
+
+    @staticmethod
+    def put_record(name, data, partition_key):
+        print "Triton put_record: {}, ({})".format(name, data, partition_key)
+
+    @staticmethod
+    def put_records(records, name, **kwargs):
+        print "Triton put_records: {}, ({})".format(name, kwargs)
+        for record in records:
+            print record
+
+
 def connect_to_region(region_name, **kw_params):
     # NOTE(rhettg): current version of boto doesn't know about us-west-1 for
     # kinesis
@@ -433,6 +455,9 @@ def get_stream(stream_name, config):
     s_config = config.get(stream_name)
     if not s_config:
         raise errors.StreamNotConfiguredError()
+
+    if s_config['test']:
+        return TestStream(s_config['name'], s_config['partition_key'])
 
     conn = connect_to_region(s_config.get('region', 'us-east-1'))
 
