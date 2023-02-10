@@ -2,7 +2,7 @@ future
 testify
 pep8
 pyflakes
-ipython==5.4
+ipython==8.10.0
 pylint
 boto
 yapf
